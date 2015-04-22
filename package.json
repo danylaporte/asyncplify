@@ -1,13 +1,21 @@
 {
   "name": "asyncplify",
   "version": "0.0.1",
-  "description": "",
+  "description": "FRP (functional reactive programming) library for Javascript",
   "main": "dist/asyncplify.js",
   "scripts": {
     "test": "mocha tests"
   },
   "author": "Dany Laporte",
+  "keywords": [
+    "LINQ",
+    "FRP",
+    "Reactive",
+    "Events",
+    "async"
+  ],
   "license": "MIT",
+  "repository": "danylaporte/asyncplify",
   "dependencies": {},
   "devDependencies": {
     "gulp": "^3.8.11",
