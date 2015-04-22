@@ -23,7 +23,7 @@ asyncplify
 ## Installation
 
 ```bash
-$ npm install asyncplicity
+$ npm install asyncplify
 ```
 
 ## License ##
