@@ -1,5 +1,5 @@
-Robinet.value = function (value, cb) {
-    return new Robinet(Value, value);
+Asyncplify.value = function (value, cb) {
+    return new Asyncplify(Value, value);
 };
 
 function Value(value, on) {

@@ -1,9 +1,9 @@
-Robinet.prototype.take = function (count) {
+Asyncplify.prototype.take = function (count) {
     return typeof count !== 'number'
         ? this
         : count <= 0
-        ? Robinet.empty()
-        : new Robinet(Take, count, this)
+        ? Asyncplify.empty()
+        : new Asyncplify(Take, count, this)
 }
 
 function Take(count, on, source) {

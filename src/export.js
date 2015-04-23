@@ -1,5 +1,5 @@
 if (typeof module !== 'undefined') {
-    module.exports = Robinet;
+    module.exports = Asyncplify;
 } else if (typeof window !== 'undefined') {
-    window.Robinet = Robinet;
+    window.Asyncplify = Asyncplify;
 }

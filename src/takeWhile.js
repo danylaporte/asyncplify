@@ -1,5 +1,5 @@
-Robinet.prototype.takeWhile = function (cond) {
-    return new Robinet(TakeWhile, cond, this);
+Asyncplify.prototype.takeWhile = function (cond) {
+    return new Asyncplify(TakeWhile, cond, this);
 }
 
 function TakeWhile(cond, on, source) {

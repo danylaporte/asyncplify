@@ -1,5 +1,5 @@
-Robinet.fromPromise = function (promise, cb) {
-    return new Robinet(FromPromise, promise);
+Asyncplify.fromPromise = function (promise, cb) {
+    return new Asyncplify(FromPromise, promise);
 }
 
 function FromPromise(promise, on) {

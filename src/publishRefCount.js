@@ -1,5 +1,5 @@
-Robinet.prototype.publishRefCount = function (options) {
-    var r = new Robinet(PublishRefCount, null, this);
+Asyncplify.prototype.publishRefCount = function (options) {
+    var r = new Asyncplify(PublishRefCount, null, this);
     r.emit = publishRefCountEmit;
     r.end = publishRefCountEnd;
     r.setState = setStateThru;

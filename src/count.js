@@ -1,5 +1,5 @@
-Robinet.prototype.count = function (cond) {
-    return new Robinet(Count, cond || condTrue, this)
+Asyncplify.prototype.count = function (cond) {
+    return new Asyncplify(Count, cond || condTrue, this)
 }
 
 function Count(cond, on, source) {

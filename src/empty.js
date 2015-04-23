@@ -1,5 +1,5 @@
-Robinet.empty = function () {
-    return new Robinet(Empty)
+Asyncplify.empty = function () {
+    return new Asyncplify(Empty)
 }
 
 function Empty(_, on) {

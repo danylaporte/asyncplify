@@ -1,5 +1,5 @@
-Robinet.merge = function (options) {
-    return new Robinet(Merge, options)
+Asyncplify.merge = function (options) {
+    return new Asyncplify(Merge, options)
 }
 
 function Merge(options, on) {

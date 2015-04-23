@@ -1,5 +1,5 @@
-Robinet.prototype.tap = function (options) {
-    return new Robinet(Tap, options, this)
+Asyncplify.prototype.tap = function (options) {
+    return new Asyncplify(Tap, options, this)
 }
 
 function Tap(options, on, source) {

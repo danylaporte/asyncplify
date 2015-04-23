@@ -1,5 +1,5 @@
-Robinet.prototype.toArray = function (options, source, cb) {
-    return new Robinet(ToArray, options || EMPTYOBJ, this)
+Asyncplify.prototype.toArray = function (options, source, cb) {
+    return new Asyncplify(ToArray, options || EMPTYOBJ, this)
 }
 
 function ToArray(options, on, source) {
@@ -21,7 +21,7 @@ function ToArray(options, on, source) {
         } else if (typeof options.split === 'function') {
             this.splitCond = options.split;
             this.emit = toArraySplitCond;
-        } else if (options.split instanceof Robinet) {
+        } else if (options.split instanceof Asyncplify) {
             new Trigger(options.split, this);
         }
     }

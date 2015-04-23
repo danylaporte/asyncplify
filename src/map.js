@@ -1,5 +1,5 @@
-Robinet.prototype.map = function (mapper) {
-    return mapper ? new Robinet(Map, mapper, this) : this;
+Asyncplify.prototype.map = function (mapper) {
+    return mapper ? new Asyncplify(Map, mapper, this) : this;
 }
 
 function Map(mapper, on, source) {

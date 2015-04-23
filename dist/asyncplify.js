@@ -10,20 +10,28 @@
             value: this.i < this.array.length ? this.array[this.i++] : undefined
         };
     };
+    function Asyncplify(func, arg, source) {
+        this._arg = arg;
+        this._func = func;
+        this._src = source;
+    }
+    Asyncplify.prototype._subscribe = function (observer) {
+        new this._func(this._arg, observer, this._src, this);
+    };
     var RUNNING = 0;
     var PAUSED = 1;
     var CLOSED = 2;
     var LAST = undefined;
     var EMPTY = 0;
     var OPEN = 1;
-    Robinet.continueState = {
+    Asyncplify.continueState = {
         LAST: LAST,
         EMPTY: EMPTY,
         OPEN: OPEN
     };
     var EMPTYOBJ = {};
-    Robinet.prototype.count = function (cond) {
-        return new Robinet(Count, cond || condTrue, this);
+    Asyncplify.prototype.count = function (cond) {
+        return new Asyncplify(Count, cond || condTrue, this);
     };
     function Count(cond, on, source) {
         this.cond = cond;
@@ -42,8 +50,8 @@
         },
         setState: setStateThru
     };
-    Robinet.empty = function () {
-        return new Robinet(Empty);
+    Asyncplify.empty = function () {
+        return new Asyncplify(Empty);
     };
     function Empty(_, on) {
         on.source = this;
@@ -51,15 +59,15 @@
     }
     Empty.prototype.setState = noop;
     if (typeof module !== 'undefined') {
-        module.exports = Robinet;
+        module.exports = Asyncplify;
     } else if (typeof window !== 'undefined') {
-        window.Robinet = Robinet;
+        window.Asyncplify = Asyncplify;
     }
-    Robinet.prototype.filter = function (cond) {
+    Asyncplify.prototype.filter = function (cond) {
         if (typeof cond === 'function')
-            return new Robinet(Filter, cond, this);
+            return new Asyncplify(Filter, cond, this);
         if (cond === false)
-            return new Robinet(Filter, condFalse, this);
+            return new Asyncplify(Filter, condFalse, this);
         return this;
     };
     function Filter(cond, on, source) {
@@ -76,8 +84,8 @@
         end: endThru,
         setState: setStateThru
     };
-    Robinet.prototype.flatMap = function (mapper) {
-        return new Robinet(FlatMap, mapper, this);
+    Asyncplify.prototype.flatMap = function (mapper) {
+        return new Asyncplify(FlatMap, mapper, this);
     };
     function FlatMap(mapper, on, source) {
         this.items = [];
@@ -124,8 +132,8 @@
         },
         setState: setStateThru
     };
-    Robinet.fromArray = function (array) {
-        return new Robinet(FromArray, array);
+    Asyncplify.fromArray = function (array) {
+        return new Asyncplify(FromArray, array);
     };
     function FromArray(array, on) {
         this.array = array;
@@ -147,12 +155,12 @@
         },
         setState: setState
     };
-    Robinet.fromNode = function (func) {
+    Asyncplify.fromNode = function (func) {
         var args = [];
         for (var i = 1; i < arguments.length; i++) {
             args.push(arguments[i]);
         }
-        return new Robinet(FromNode, {
+        return new Asyncplify(FromNode, {
             func: func,
             args: args,
             self: this
@@ -193,8 +201,8 @@
         },
         setState: setState
     };
-    Robinet.fromPromise = function (promise, cb) {
-        return new Robinet(FromPromise, promise);
+    Asyncplify.fromPromise = function (promise, cb) {
+        return new Asyncplify(FromPromise, promise);
     };
     function FromPromise(promise, on) {
         this.on = on;
@@ -228,8 +236,8 @@
         },
         setState: setState
     };
-    Robinet.prototype.groupBy = function (options) {
-        return new Robinet(GroupBy, options, this);
+    Asyncplify.prototype.groupBy = function (options) {
+        return new Asyncplify(GroupBy, options, this);
     };
     function GroupBy(options, on, source) {
         this.elementSelector = options && options.elementSelector || identity;
@@ -245,7 +253,7 @@
             var key = this.keySelector(v);
             var group = this.store[key];
             if (!group) {
-                group = this.store[key] = Robinet.subject();
+                group = this.store[key] = Asyncplify.subject();
                 this.on.emit(group);
             }
             group.emit(this.elementSelector(v));
@@ -257,8 +265,8 @@
             this.on.end(err);
         }
     };
-    Robinet.interval = function (options) {
-        return new Robinet(Interval, options);
+    Asyncplify.interval = function (options) {
+        return new Asyncplify(Interval, options);
     };
     function Interval(options, on) {
         this.scheduledItems = [];
@@ -293,8 +301,8 @@
             }
         }
     };
-    Robinet.prototype.map = function (mapper) {
-        return mapper ? new Robinet(Map, mapper, this) : this;
+    Asyncplify.prototype.map = function (mapper) {
+        return mapper ? new Asyncplify(Map, mapper, this) : this;
     };
     function Map(mapper, on, source) {
         this.mapper = mapper;
@@ -310,8 +318,8 @@
         end: endThru,
         setState: setStateThru
     };
-    Robinet.merge = function (options) {
-        return new Robinet(Merge, options);
+    Asyncplify.merge = function (options) {
+        return new Asyncplify(Merge, options);
     };
     function Merge(options, on) {
         var items = options.items || options;
@@ -364,8 +372,8 @@
             }
         }
     };
-    Robinet.prototype.publishRefCount = function (options) {
-        var r = new Robinet(PublishRefCount, null, this);
+    Asyncplify.prototype.publishRefCount = function (options) {
+        var r = new Asyncplify(PublishRefCount, null, this);
         r.emit = publishRefCountEmit;
         r.end = publishRefCountEnd;
         r.setState = setStateThru;
@@ -415,8 +423,8 @@
             }
         }
     };
-    Robinet.range = function (options) {
-        return new Robinet(Range, options);
+    Asyncplify.range = function (options) {
+        return new Asyncplify(Range, options);
     };
     function Range(options, on) {
         this.i = options && options.start || 0;
@@ -501,16 +509,8 @@
     });
 };
 */
-    function Robinet(func, arg, source) {
-        this._arg = arg;
-        this._func = func;
-        this._src = source;
-    }
-    Robinet.prototype._subscribe = function (observer) {
-        new this._func(this._arg, observer, this._src, this);
-    };
-    Robinet.prototype.skip = function (count) {
-        return typeof count !== 'number' || count <= 0 ? this : new Robinet(Skip, count, this);
+    Asyncplify.prototype.skip = function (count) {
+        return typeof count !== 'number' || count <= 0 ? this : new Asyncplify(Skip, count, this);
     };
     function Skip(count, on, source) {
         this.count = count;
@@ -530,8 +530,8 @@
         end: endThru,
         setState: setStateThru
     };
-    Robinet.prototype.skipUntil = function (trigger) {
-        return new Robinet(SkipUntil, trigger, this);
+    Asyncplify.prototype.skipUntil = function (trigger) {
+        return new Asyncplify(SkipUntil, trigger, this);
     };
     function SkipUntil(trigger, on, source) {
         this.can = false;
@@ -566,8 +566,8 @@
             this.can = true;
         }
     };
-    Robinet.prototype.skipWhile = function (cond) {
-        return new Robinet(SkipWhile, cond, this);
+    Asyncplify.prototype.skipWhile = function (cond) {
+        return new Asyncplify(SkipWhile, cond, this);
     };
     function SkipWhile(cond, on, source) {
         this.can = false;
@@ -587,8 +587,8 @@
         end: endThru,
         setState: setStateThru
     };
-    Robinet.subject = function () {
-        var r = new Robinet(Subject);
+    Asyncplify.subject = function () {
+        var r = new Asyncplify(Subject);
         r.subjects = [];
         r.emit = subjectEmit;
         r.end = subjectEnd;
@@ -641,7 +641,7 @@
             }
         }
     };
-    Robinet.prototype.subscribe = function (options) {
+    Asyncplify.prototype.subscribe = function (options) {
         return new Subscribe(options || EMPTYOBJ, this);
     };
     function Subscribe(options, source) {
@@ -661,8 +661,8 @@
             this.source.setState(RUNNING);
         }
     };
-    Robinet.prototype.sum = function (mapper, source, cb) {
-        return new Robinet(Sum, mapper || identity, this);
+    Asyncplify.prototype.sum = function (mapper, source, cb) {
+        return new Asyncplify(Sum, mapper || identity, this);
     };
     function Sum(mapper, on, source) {
         this.hasValue = false;
@@ -684,8 +684,8 @@
         },
         setState: setStateThru
     };
-    Robinet.prototype.take = function (count) {
-        return typeof count !== 'number' ? this : count <= 0 ? Robinet.empty() : new Robinet(Take, count, this);
+    Asyncplify.prototype.take = function (count) {
+        return typeof count !== 'number' ? this : count <= 0 ? Asyncplify.empty() : new Asyncplify(Take, count, this);
     };
     function Take(count, on, source) {
         this.count = count;
@@ -707,8 +707,8 @@
         end: endThru,
         setState: setStateThru
     };
-    Robinet.prototype.takeUntil = function (trigger) {
-        return new Robinet(TakeUntil, trigger, this);
+    Asyncplify.prototype.takeUntil = function (trigger) {
+        return new Asyncplify(TakeUntil, trigger, this);
     };
     function TakeUntil(trigger, on, source) {
         this.on = on;
@@ -739,8 +739,8 @@
             this.on.end(null);
         }
     };
-    Robinet.prototype.takeWhile = function (cond) {
-        return new Robinet(TakeWhile, cond, this);
+    Asyncplify.prototype.takeWhile = function (cond) {
+        return new Asyncplify(TakeWhile, cond, this);
     };
     function TakeWhile(cond, on, source) {
         this.cond = cond;
@@ -761,8 +761,8 @@
         end: endThru,
         setState: setStateThru
     };
-    Robinet.prototype.tap = function (options) {
-        return new Robinet(Tap, options, this);
+    Asyncplify.prototype.tap = function (options) {
+        return new Asyncplify(Tap, options, this);
     };
     function Tap(options, on, source) {
         this._emit = options && options.emit || typeof options === 'function' && options || noop;
@@ -791,8 +791,8 @@
             this.source.setState(state);
         }
     };
-    Robinet.prototype.toArray = function (options, source, cb) {
-        return new Robinet(ToArray, options || EMPTYOBJ, this);
+    Asyncplify.prototype.toArray = function (options, source, cb) {
+        return new Asyncplify(ToArray, options || EMPTYOBJ, this);
     };
     function ToArray(options, on, source) {
         this.array = [];
@@ -812,7 +812,7 @@
             } else if (typeof options.split === 'function') {
                 this.splitCond = options.split;
                 this.emit = toArraySplitCond;
-            } else if (options.split instanceof Robinet) {
+            } else if (options.split instanceof Asyncplify) {
                 new Trigger(options.split, this);
             }
         }
@@ -900,8 +900,8 @@
     function setStateThru(state) {
         this.source.setState(state);
     }
-    Robinet.value = function (value, cb) {
-        return new Robinet(Value, value);
+    Asyncplify.value = function (value, cb) {
+        return new Asyncplify(Value, value);
     };
     function Value(value, on) {
         this.on = on;
@@ -1045,7 +1045,7 @@
     function timeoutFactory(item) {
         return item.dueTime ? new AbsoluteTimeoutItem(this, item.action, item.dueTime) : new RelativeTimeoutItem(this, item.action, item.delay);
     }
-    var schedulers = Robinet.schedulers = {
+    var schedulers = Asyncplify.schedulers = {
         immediate: function () {
             return new ScheduleContext(immediateFactory);
         },

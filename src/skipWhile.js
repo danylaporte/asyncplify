@@ -1,5 +1,5 @@
-Robinet.prototype.skipWhile = function (cond) {
-    return new Robinet(SkipWhile, cond, this);
+Asyncplify.prototype.skipWhile = function (cond) {
+    return new Asyncplify(SkipWhile, cond, this);
 }
 
 function SkipWhile(cond, on, source) {

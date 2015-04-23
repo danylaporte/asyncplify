@@ -1,11 +1,11 @@
-Robinet.fromNode = function (func) {
+Asyncplify.fromNode = function (func) {
     var args = [];
 
     for (var i = 1; i < arguments.length; i++) {
         args.push(arguments[i]);
     }
 
-    return new Robinet(FromNode, { func: func, args: args, self: this });
+    return new Asyncplify(FromNode, { func: func, args: args, self: this });
 }
 
 function FromNode(options, on) {

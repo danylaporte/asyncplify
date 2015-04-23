@@ -1,5 +1,5 @@
-Robinet.prototype.takeUntil = function (trigger) {
-    return new Robinet(TakeUntil, trigger, this)
+Asyncplify.prototype.takeUntil = function (trigger) {
+    return new Asyncplify(TakeUntil, trigger, this)
 }
 
 function TakeUntil(trigger, on, source) {

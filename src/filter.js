@@ -1,9 +1,9 @@
-Robinet.prototype.filter = function (cond) {
+Asyncplify.prototype.filter = function (cond) {
     if (typeof cond === 'function')
-        return new Robinet(Filter, cond, this);
+        return new Asyncplify(Filter, cond, this);
 
     if (cond === false)
-        return new Robinet(Filter, condFalse, this);
+        return new Asyncplify(Filter, condFalse, this);
 
     return this;
 }

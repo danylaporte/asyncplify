@@ -1,5 +1,5 @@
-Robinet.interval = function (options) {
-    return new Robinet(Interval, options)
+Asyncplify.interval = function (options) {
+    return new Asyncplify(Interval, options)
 }
 
 function Interval(options, on) {

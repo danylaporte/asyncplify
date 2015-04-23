@@ -1,5 +1,5 @@
-Robinet.subject = function () {
-    var r = new Robinet(Subject);
+Asyncplify.subject = function () {
+    var r = new Asyncplify(Subject);
     r.subjects = [];
     r.emit = subjectEmit;
     r.end = subjectEnd;

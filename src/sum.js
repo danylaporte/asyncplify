@@ -1,5 +1,5 @@
-Robinet.prototype.sum = function (mapper, source, cb) {
-    return new Robinet(Sum, mapper || identity, this)
+Asyncplify.prototype.sum = function (mapper, source, cb) {
+    return new Asyncplify(Sum, mapper || identity, this)
 }
 
 function Sum(mapper, on, source) {

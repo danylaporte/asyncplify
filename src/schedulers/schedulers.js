@@ -24,7 +24,7 @@ function timeoutFactory(item) {
         : new RelativeTimeoutItem(this, item.action, item.delay);
 }
 
-var schedulers = Robinet.schedulers = {
+var schedulers = Asyncplify.schedulers = {
     immediate: function () {
         return new ScheduleContext(immediateFactory);
     },

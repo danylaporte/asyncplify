@@ -1,5 +1,5 @@
-Robinet.prototype.groupBy = function(options) {
-    return new Robinet(GroupBy, options, this)
+Asyncplify.prototype.groupBy = function(options) {
+    return new Asyncplify(GroupBy, options, this)
 }
 
 function GroupBy(options, on, source) {
@@ -19,7 +19,7 @@ GroupBy.prototype = {
         var group = this.store[key];
 
         if (!group) {
-            group = this.store[key] = Robinet.subject()
+            group = this.store[key] = Asyncplify.subject()
             this.on.emit(group);
         }
 

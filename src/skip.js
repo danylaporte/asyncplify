@@ -1,7 +1,7 @@
-Robinet.prototype.skip = function (count) {
+Asyncplify.prototype.skip = function (count) {
     return typeof count !== 'number' || count <= 0
         ? this
-        : new Robinet(Skip, count, this)
+        : new Asyncplify(Skip, count, this)
 }
 
 function Skip(count, on, source) {

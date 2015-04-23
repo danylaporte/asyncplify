@@ -1,4 +1,4 @@
-Robinet.prototype.subscribe = function (options) {
+Asyncplify.prototype.subscribe = function (options) {
     return new Subscribe(options || EMPTYOBJ, this)
 }
 

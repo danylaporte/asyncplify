@@ -1,5 +1,5 @@
-Robinet.fromArray = function (array) {
-    return new Robinet(FromArray, array);
+Asyncplify.fromArray = function (array) {
+    return new Asyncplify(FromArray, array);
 }
 
 function FromArray(array, on) {

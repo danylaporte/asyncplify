@@ -6,7 +6,7 @@ var LAST = undefined;
 var EMPTY = 0;
 var OPEN = 1;
 
-Robinet.continueState = {
+Asyncplify.continueState = {
     LAST: LAST,
     EMPTY: EMPTY,
     OPEN: OPEN

@@ -1,5 +1,5 @@
-Robinet.range = function (options) {
-    return new Robinet(Range, options);
+Asyncplify.range = function (options) {
+    return new Asyncplify(Range, options);
 }
 
 function Range(options, on) {

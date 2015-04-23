@@ -1,5 +1,5 @@
-Robinet.prototype.skipUntil = function (trigger) {
-    return new Robinet(SkipUntil, trigger, this)
+Asyncplify.prototype.skipUntil = function (trigger) {
+    return new Asyncplify(SkipUntil, trigger, this)
 }
 
 function SkipUntil(trigger, on, source) {

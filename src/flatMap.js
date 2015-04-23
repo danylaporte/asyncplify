@@ -1,5 +1,5 @@
-Robinet.prototype.flatMap = function(mapper) {
-    return new Robinet(FlatMap, mapper, this)
+Asyncplify.prototype.flatMap = function(mapper) {
+    return new Asyncplify(FlatMap, mapper, this)
 }
 
 function FlatMap(mapper, on, source) {
