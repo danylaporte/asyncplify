@@ -372,6 +372,9 @@
             }
         }
     };
+    Asyncplify.prototype.pipe = function (func) {
+        return func(this);
+    };
     Asyncplify.prototype.publishRefCount = function (options) {
         var r = new Asyncplify(PublishRefCount, null, this);
         r.emit = publishRefCountEmit;
