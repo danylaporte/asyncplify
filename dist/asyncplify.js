@@ -301,11 +301,26 @@
             }
         }
     };
-    Asyncplify.prototype.last = function (count) {
-        return new Asyncplify(Last, count, this);
+    Asyncplify.prototype.last = function (options) {
+        return new Asyncplify(Last, options, this);
     };
-    function Last(count, on, source) {
-        this.count = count;
+    function Last(options, on, source) {
+        this.count = 1;
+        this.cond = condTrue;
+        switch (typeof options) {
+        case 'number':
+            this.count = options;
+            break;
+        case 'function':
+            this.cond = options;
+            break;
+        default:
+            if (options) {
+                this.count = typeof options.count === 'number' ? options.count : 1;
+                this.cond = options.cond || condTrue;
+            }
+            break;
+        }
         this.on = on;
         this.source = null;
         this.items = [];
@@ -322,8 +337,10 @@
             this.state === RUNNING && this.on.end(null);
         },
         emit: function (value) {
-            this.items.push(value);
-            this.items.length > this.count && this.items.splice(0, 1);
+            if (this.cond(value)) {
+                this.items.push(value);
+                this.items.length > this.count && this.items.splice(0, 1);
+            }
         },
         end: function (err) {
             err ? this.end(err) : this.do();

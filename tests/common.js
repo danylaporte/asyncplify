@@ -16,8 +16,8 @@ exports.itShouldClose = function (source) {
     })
 }
 
-exports.itShouldEmitValue = function (source, expected) {
-    it('should emit a value', function (done) {
+exports.itShouldEmitValue = function (source, expected, title) {
+    it(title || 'should emit a value', function (done) {
         var array = [];
 
         source.subscribe({
@@ -30,8 +30,8 @@ exports.itShouldEmitValue = function (source, expected) {
     })
 }
 
-exports.itShouldEmitValues = function (source, expected) {
-    it('should emit values', function (done) {
+exports.itShouldEmitValues = function (source, expected, title) {
+    it(title || 'should emit values', function (done) {
         var array = [];
 
         source.subscribe({
