@@ -30,6 +30,26 @@ function removeItem(items, item) {
     }
 }
 
+function setCountAndCond(self, options) {
+    switch (typeof options) {
+
+        case 'number':
+            self.count = options;
+            break;
+
+        case 'function':
+            self.cond = options;
+            break;
+
+        default:
+            if (options) {
+                if (typeof options.count === 'number') self.count = options.count;
+                self.cond = options.cond || condTrue;
+            }
+            break;
+    }
+}
+
 function setState(state) {
     if (this.state !== CLOSED && this.state !== state) {
         this.state = state;

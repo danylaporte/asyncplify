@@ -11,5 +11,5 @@ describe('zip', function () {
     common.itShouldNotProduceAnError(source);
     common.itShouldEndOnce(source);
     common.itShouldEndSync(source);
-    common.itShouldEmitValue(source, [0, 1]);
+    common.itShouldEmitValues(source, [[0, 1]]);
 })

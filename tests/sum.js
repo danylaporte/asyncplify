@@ -10,7 +10,7 @@ describe('sum', function(){
     common.itShouldNotProduceAnError(source);
     common.itShouldEndOnce(source);
     common.itShouldEndSync(source);
-    common.itShouldEmitValue(source, 3);
+    common.itShouldEmitValues(source, [3]);
 
     it('should support having a mapper',  function (done) {
         asyncplify.fromArray([1, 2])

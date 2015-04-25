@@ -5,55 +5,54 @@ Asyncplify.prototype.last = function (options) {
 function Last(options, on, source) {
     this.count = 1;
     this.cond = condTrue;
-
-    switch (typeof options) {
-        case 'number':
-            this.count = options;
-            break;
-        case 'function':
-            this.cond = options;
-            break;
-
-        default:
-            if (options) {
-                this.count = typeof options.count === 'number' ? options.count : 1;
-                this.cond = options.cond || condTrue;
-            }
-            break;
-    }
-
+    this.items = [];
     this.on = on;
     this.source = null;
-    this.items = [];
     this.state = RUNNING;
-    this.endCalled = false;
 
-    on.source = this;
-    source._subscribe(this);
+    setCountAndCond(this, options);
+
+    if (!this.count) {
+        this.state = CLOSED;
+        on.end(null);
+    } else {
+        on.source = this;
+        source._subscribe(this);
+    }
 }
 
 Last.prototype = {
     do: function () {
-        for (var i = 0; i < this.items.length && this.state === RUNNING; i++) {
-            this.on.emit(this.items[i]);
+        while (this.items.length && this.state === RUNNING) {
+            this.on.emit(this.items.pop());
         }
 
-        this.state === RUNNING && this.on.end(null);
+        if (this.state === RUNNING) {
+            this.state = CLOSED;
+            this.on.end(null);
+        }
     },
     emit: function (value) {
         if (this.cond(value)) {
-            this.items.push(value);
-            this.items.length > this.count && this.items.splice(0, 1);
+            this.items.unshift(value);
+            this.count > 0 && this.items.length > this.count && this.items.pop();
         }
     },
     end: function (err) {
-        err ? this.end(err) : this.do();
+        this.source = null;
+
+        if (err) {
+            this.state = CLOSED;
+            this.end(err);
+        } else {
+            this.do();
+        }
     },
     setState: function (state) {
         if (this.state !== state && this.state != CLOSED) {
             this.state = state;
-            this.source.setState(state);
-            this.state === RUNNING && this.do();
+            this.source && this.source.setState(state);
+            this.state === RUNNING && !this.source && this.do();
         }
     }
 }

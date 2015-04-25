@@ -10,7 +10,7 @@ describe('toArray', function () {
     common.itShouldNotProduceAnError(source);
     common.itShouldEndOnce(source);
     common.itShouldEndSync(source);
-    common.itShouldEmitValue(source, [1]);
+    common.itShouldEmitValues(source, [[1]]);
 
     it('should allow to split at a length', function () {
         var count = 0;

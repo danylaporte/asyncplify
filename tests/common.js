@@ -16,20 +16,6 @@ exports.itShouldClose = function (source) {
     })
 }
 
-exports.itShouldEmitValue = function (source, expected, title) {
-    it(title || 'should emit a value', function (done) {
-        var array = [];
-
-        source.subscribe({
-            emit: array.push.bind(array),
-            end: function () {
-                array.should.eql([expected]);
-                done();
-            }
-        })
-    })
-}
-
 exports.itShouldEmitValues = function (source, expected, title) {
     it(title || 'should emit values', function (done) {
         var array = [];

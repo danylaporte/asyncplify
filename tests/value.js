@@ -8,5 +8,5 @@ describe('value', function () {
     common.itShouldNotProduceAnError(source);
     common.itShouldEndOnce(source);
     common.itShouldEndSync(source);
-    common.itShouldEmitValue(source, 10);
+    common.itShouldEmitValues(source, [10]);
 })
