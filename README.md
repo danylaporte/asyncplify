@@ -26,6 +26,10 @@ asyncplify
 $ npm install asyncplify
 ```
 
+## Documentation
+- [Performance](https://github.com/danylaporte/asyncplify/tree/master/perf)
+
+
 ## License ##
 The MIT License (MIT)
 

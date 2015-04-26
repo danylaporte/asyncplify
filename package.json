@@ -18,6 +18,7 @@
   "repository": "danylaporte/asyncplify",
   "dependencies": {},
   "devDependencies": {
+    "bluebird": "^2.9.24",
     "gulp": "^3.8.11",
     "gulp-bench": "^1.1.0",
     "gulp-concat": "^2.5.2",

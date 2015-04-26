@@ -5,7 +5,7 @@ Asyncplify.fromNode = function (func) {
         args.push(arguments[i]);
     }
 
-    return new Asyncplify(FromNode, { func: func, args: args, self: this });
+    return new Asyncplify(FromNode, [func, args]);
 }
 
 function FromNode(options, on) {
@@ -16,7 +16,7 @@ function FromNode(options, on) {
     this.value = null;
 
     on.source = this;
-    options.func.apply(options.self, options.args.concat(this.cb.bind(this)));
+    options[0].apply(options.self, options[1].concat(this.cb.bind(this)));
 }
 
 FromNode.prototype = {
