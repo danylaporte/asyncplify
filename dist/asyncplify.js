@@ -38,6 +38,7 @@
         this.value = 0;
         this.on = on;
         this.source = null;
+        on.source = this;
         source._subscribe(this);
     }
     Count.prototype = {
@@ -83,6 +84,27 @@
         },
         end: endThru,
         setState: setStateThru
+    };
+    Asyncplify.prototype.finally = function (action) {
+        return action ? new Asyncplify(Finally, action, this) : this;
+    };
+    function Finally(action, on, source) {
+        this.action = action;
+        this.on = on;
+        this.source = null;
+        on.source = this;
+        source._subscribe(this);
+    }
+    Finally.prototype = {
+        emit: emitThru,
+        end: function (err) {
+            this.action();
+            this.on.end(err);
+        },
+        setState: function (state) {
+            this.source.setState(state);
+            this.action();
+        }
     };
     Asyncplify.prototype.flatMap = function (mapper) {
         return new Asyncplify(FlatMap, mapper, this);
@@ -423,6 +445,13 @@
             }
         }
     };
+    Asyncplify.never = function () {
+        return new Asyncplify(Never);
+    };
+    function Never(_, on) {
+        on.source = this;
+    }
+    Never.prototype.setState = noop;
     Asyncplify.prototype.pipe = function (func) {
         return func(this);
     };

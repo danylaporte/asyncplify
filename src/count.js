@@ -7,6 +7,8 @@ function Count(cond, on, source) {
     this.value = 0;
     this.on = on;
     this.source = null;
+
+    on.source = this;
     source._subscribe(this);
 }
 
