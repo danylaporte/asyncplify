@@ -27,4 +27,26 @@ describe('flatMap', function () {
 
         mapperCount.should.equal(2);
     });
+    
+    it('should support maxConcurrency', function (done) {
+       asyncplify
+            .range(2)
+            .flatMap({
+                mapper: function (x) {
+                    if (x === 1)
+                        return asyncplify.value('b');
+
+                    return asyncplify
+                        .interval(1)
+                        .take(2)
+                        .map(function () { return 'a'; });
+                },
+                maxConcurrency: 1
+            })
+            .toArray()
+            .subscribe(function(v) {
+                v.should.eql(['a', 'a', 'b']);
+                done();
+            });
+    });
 });

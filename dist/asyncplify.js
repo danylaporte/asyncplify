@@ -106,12 +106,13 @@
             this.action();
         }
     };
-    Asyncplify.prototype.flatMap = function (mapper) {
-        return new Asyncplify(FlatMap, mapper, this);
+    Asyncplify.prototype.flatMap = function (options) {
+        return new Asyncplify(FlatMap, options, this);
     };
-    function FlatMap(mapper, on, source) {
+    function FlatMap(options, on, source) {
         this.items = [];
-        this.mapper = mapper;
+        this.mapper = options.mapper || options;
+        this.maxConcurrency = Math.max(options.maxConcurrency || 0, 0);
         this.on = on;
         this.source = null;
         on.source = this;
@@ -119,13 +120,25 @@
     }
     FlatMap.prototype = {
         childEnd: function (err, item) {
+            var count = this.items.length;
             removeItem(this.items, item);
-            err && this.setState(CLOSED);
-            (err || !this.items.length && !this.source) && this.on.end(err);
+            if (err) {
+                this.setState(CLOSED);
+                this.on.end(err);
+            } else if (!this.items.length && !this.source) {
+                this.on.end(null);
+            } else if (this.source && this.maxConcurrency && count === this.maxConcurrency) {
+                this.source.setState(RUNNING);
+            }
         },
         emit: function (v) {
             var item = this.mapper(v);
-            item && new FlatMapItem(this, item);
+            if (item) {
+                var flatMapItem = new FlatMapItem(this);
+                this.items.push(flatMapItem);
+                this.maxConcurrency && this.items.length === this.maxConcurrency && this.source.setState(PAUSED);
+                item._subscribe(flatMapItem);
+            }
         },
         end: function (err) {
             this.source = null;
@@ -133,17 +146,15 @@
             (err || !this.items.length) && this.on.end(err);
         },
         setState: function (state) {
-            this.source && this.source.setState(state);
+            this.source && (state !== RUNNING || !this.maxConcurrency || this.items.length < this.maxConcurrency) && this.source.setState(state);
             for (var i = 0; i < this.items.length; i++) {
                 this.items[i].setState(state);
             }
         }
     };
-    function FlatMapItem(on, source) {
+    function FlatMapItem(on) {
         this.on = on;
         this.source = null;
-        on.items.push(this);
-        source._subscribe(this);
     }
     FlatMapItem.prototype = {
         emit: function (v) {
@@ -520,8 +531,10 @@
     }
     Range.prototype = {
         do: function () {
-            for (; this.i < this.end && this.state === RUNNING; this.i += this.step) {
-                this.on.emit(this.i);
+            while (this.i < this.end && this.state === RUNNING) {
+                var v = this.i;
+                this.i += this.step;
+                this.on.emit(v);
             }
             if (this.state === RUNNING) {
                 this.state = CLOSED;
@@ -1021,7 +1034,7 @@
     function setState(state) {
         if (this.state !== CLOSED && this.state !== state) {
             this.state = state;
-            this.state !== CLOSED && this.do();
+            this.state === RUNNING && this.do();
         }
     }
     function setStateThru(state) {

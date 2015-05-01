@@ -53,7 +53,7 @@ function setCountAndCond(self, options) {
 function setState(state) {
     if (this.state !== CLOSED && this.state !== state) {
         this.state = state;
-        this.state !== CLOSED && this.do();
+        this.state === RUNNING && this.do();
     }
 }
 

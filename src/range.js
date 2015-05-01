@@ -15,8 +15,10 @@ function Range(options, on) {
 
 Range.prototype = {
     do: function () {
-        for (; this.i < this.end && this.state === RUNNING; this.i += this.step) {
-            this.on.emit(this.i);
+        while (this.i < this.end && this.state === RUNNING) {
+            var v = this.i;
+            this.i += this.step;
+            this.on.emit(v);
         }
 
         if (this.state === RUNNING) {
