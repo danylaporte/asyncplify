@@ -20,6 +20,7 @@ GroupBy.prototype = {
 
         if (!group) {
             group = this.store[key] = Asyncplify.subject()
+            group.key = key;
             this.on.emit(group);
         }
 

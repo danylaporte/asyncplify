@@ -12,4 +12,11 @@ describe('groupBy', function () {
     common.itShouldEndOnce(source);
     common.itShouldEndSync(source);
     common.itShouldEmitValues(source, [[0,2],[1,3]]);
+    
+    source = asyncplify
+        .range(4)
+        .groupBy(function (v) { return v % 2; })
+        .map(function (v) { return v.key; });
+        
+    common.itShouldEmitValues(source, [0, 1]);
 })
