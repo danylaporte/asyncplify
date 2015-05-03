@@ -14,10 +14,10 @@ function FromArray(array, on) {
 
 FromArray.prototype = {
     do: function () {
-        for (; this.i < this.array.length && this.state === RUNNING; this.i++) {
-            this.on.emit(this.array[this.i]);
+        while (this.i < this.array.length && this.state === RUNNING) {
+            this.on.emit(this.array[this.i++]);
         }
-
+        
         if (this.state === RUNNING) {
             this.state = CLOSED;
             this.on.end(null);
