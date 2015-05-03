@@ -178,8 +178,8 @@
     }
     FromArray.prototype = {
         do: function () {
-            for (; this.i < this.array.length && this.state === RUNNING; this.i++) {
-                this.on.emit(this.array[this.i]);
+            while (this.i < this.array.length && this.state === RUNNING) {
+                this.on.emit(this.array[this.i++]);
             }
             if (this.state === RUNNING) {
                 this.state = CLOSED;
@@ -286,6 +286,7 @@
             var group = this.store[key];
             if (!group) {
                 group = this.store[key] = Asyncplify.subject();
+                group.key = key;
                 this.on.emit(group);
             }
             group.emit(this.elementSelector(v));
