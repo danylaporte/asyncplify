@@ -1064,6 +1064,7 @@
     };
     function Zip(options, on) {
         var items = options.items || options || [];
+        this.mapper = options && options.mapper || null;
         this.on = on;
         this.state = RUNNING;
         this.subscriptions = [];
@@ -1112,7 +1113,7 @@
                 for (i = 0; i < subscriptions.length; i++) {
                     array.push(subscriptions[i].items.splice(0, 1)[0]);
                 }
-                this.on.on.emit(array);
+                this.on.on.emit(this.on.mapper ? this.on.mapper.apply(null, array) : array);
             }
         },
         end: function (err) {
