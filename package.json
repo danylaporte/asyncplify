@@ -30,6 +30,7 @@
     "mocha": "^2.2.4",
     "rx": "^2.5.2",
     "should": "^6.0.1",
-    "source-map-support": "^0.2.10"
+    "source-map-support": "^0.2.10",
+    "transducers-js": "^0.4.166"
   }
 }
