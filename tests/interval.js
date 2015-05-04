@@ -1,5 +1,6 @@
 var asyncplify = require('../dist/asyncplify');
 var assert = require('assert');
+var common = require('./common');
 var should = require('should');
 
 describe('interval', function () {
@@ -13,7 +14,7 @@ describe('interval', function () {
             .take(1)
             .subscribe({
                 emit: function (v) {
-                    assert(v === undefined);
+                    v.should.equal(0);
                     count++;
 
                     var delay = new Date() - start;
@@ -28,4 +29,7 @@ describe('interval', function () {
                 }
             })
     })
+    
+    var source = asyncplify.interval(1).take(3);
+    common.itShouldEmitValues(source, [0, 1, 2], 'should output some values');
 })

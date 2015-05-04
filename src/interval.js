@@ -7,6 +7,7 @@ function Interval(options, on) {
     this.scheduler = options.scheduler || schedulers.timeout();
     this.on = on;
     this.state = RUNNING;
+    this.i = 0;
 
     this.item = {
         action: noop,
@@ -23,7 +24,7 @@ Interval.prototype = {
         if (this.err) {
             this.on.end(err);
         } else {
-            this.on.emit();
+            this.on.emit(this.i++);
             this.state === RUNNING && this.scheduler.schedule(this.item);
         }
     },
