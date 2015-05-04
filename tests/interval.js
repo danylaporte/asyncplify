@@ -6,7 +6,6 @@ var should = require('should');
 describe('interval', function () {
     it('should emit first value after a delay', function (done) {
         var count = 0;
-        var array = [];
         var start = new Date();
 
         asyncplify
@@ -30,6 +29,12 @@ describe('interval', function () {
             })
     })
     
-    var source = asyncplify.interval(1).take(3);
-    common.itShouldEmitValues(source, [0, 1, 2], 'should output some values');
+    var source = asyncplify.interval(1).take(1);
+    common.itShouldClose(source);
+    common.itShouldNotProduceAnError(source);
+    common.itShouldEndOnce(source);
+    common.itShouldEndAsync(source);
+    
+    source = asyncplify.interval(1).take(3);
+    common.itShouldEmitValues(source, [0, 1, 2]);
 })
