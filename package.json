@@ -1,6 +1,6 @@
 {
   "name": "asyncplify",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "FRP (functional reactive programming) library for Javascript",
   "main": "dist/asyncplify.js",
   "scripts": {
