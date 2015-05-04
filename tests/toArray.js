@@ -11,46 +11,18 @@ describe('toArray', function () {
     common.itShouldEndOnce(source);
     common.itShouldEndSync(source);
     common.itShouldEmitValues(source, [[1]]);
-
-    it('should allow to split at a length', function () {
-        var count = 0;
-        var array = [];
-
-        asyncplify
-            .range(4)
-            .toArray({ split: 2 })
-            .subscribe({
-                emit: function (v) { array.push(v); },
-                end: function (err) {
-                    assert(err === null);
-                    count++;
-                }
-            });
-
-        array.should.eql([[0,1], [2,3]]);
-        count.should.equal(1);
-    })
-
-    it('should allow to split by a condition', function () {
-        var count = 0;
-        var array = [];
-
-        function cond(x) { return x == 2; }
-
-        asyncplify
-            .range(4)
-            .toArray({ split: cond })
-            .subscribe({
-                emit: function (v) { array.push(v); },
-                end: function (err) {
-                    assert(err === null);
-                    count++;
-                }
-            });
-
-        array.should.eql([[0,1], [2,3]]);
-        count.should.equal(1);
-    })
+    
+    source = asyncplify
+        .range(4)
+        .toArray({ split: 2 });
+        
+    common.itShouldEmitValues(source, [[0,1], [2,3]], 'should allow to split at a length');
+    
+    source = asyncplify
+        .range(4)
+        .toArray({ split: function (x) { return x === 2 } });
+    
+    common.itShouldEmitValues(source, [[0,1], [2,3]], 'should allow to split by a condition');
 
     it('should allow to split by a trigger', function () {
         var count = 0;
