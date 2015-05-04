@@ -63,5 +63,6 @@ MergeItem.prototype = {
                 new MergeItem(next.value, this.on);
             }
         }
-    }
+    },
+    setState: setStateThru
 }

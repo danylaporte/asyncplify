@@ -456,7 +456,8 @@
                     new MergeItem(next.value, this.on);
                 }
             }
-        }
+        },
+        setState: setStateThru
     };
     Asyncplify.never = function () {
         return new Asyncplify(Never);

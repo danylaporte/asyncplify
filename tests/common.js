@@ -3,8 +3,8 @@ require('source-map-support').install();
 var should = require('should');
 var assert = require('assert');
 
-exports.itShouldClose = function (source) {
-    it('should close', function () {
+exports.itShouldClose = function (source, title) {
+    it(title || 'should close', function () {
         var v = source.subscribe({
             emit: function () { },
             end: function (err) {

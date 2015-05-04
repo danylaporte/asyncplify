@@ -40,4 +40,9 @@ describe('merge', function () {
         array.should.eql([1, 2]);
         count.should.equal(1);
     })
+    
+    source = asyncplify
+        .merge([asyncplify.value(0), asyncplify.interval(1)]);
+    
+    common.itShouldClose(source, 'should not throw on closing in child item');
 })
