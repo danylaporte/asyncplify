@@ -14,7 +14,7 @@ function Count(cond, on, source) {
 
 Count.prototype = {
     emit: function (value) {
-        this.cond() && this.value++;
+        this.cond(value) && this.value++;
     },
     end: function (err) {
         !err && this.on.emit(this.value);
