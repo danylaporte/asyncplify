@@ -393,11 +393,11 @@
         return new Asyncplify(Interval, options);
     };
     function Interval(options, on) {
-        this.scheduledItems = [];
         this.scheduler = options.scheduler || schedulers.timeout();
         this.on = on;
         this.state = RUNNING;
         this.i = 0;
+        this.itemPending = true;
         this.item = {
             action: noop,
             delay: typeof options === 'number' ? options : options.delay || 0
@@ -408,7 +408,9 @@
     }
     Interval.prototype = {
         scheduledItemDone: function (err) {
+            this.itemPending = false;
             if (this.err) {
+                this.state = CLOSED;
                 this.on.end(err);
             } else {
                 this.on.emit(this.i++);
@@ -419,7 +421,7 @@
             if (this.state !== state && this.state !== CLOSED) {
                 this.state = state;
                 if (state === RUNNING) {
-                    !this.scheduledItems.length && this.scheduler.schedule(this.item);
+                    !this.itemPending && this.scheduler.schedule(this.item);
                 } else {
                     this.scheduler.setState(this, state);
                 }
