@@ -22,7 +22,6 @@
         return new Asyncplify(CombineLatest, options);
     };
     function CombineLatest(options, on) {
-        this.hasAllValues = options && options.emitUndefined || false;
         this.mapper = options && options.mapper || null;
         this.on = on;
         this.state = RUNNING;
@@ -37,20 +36,13 @@
         while (!(next = iterator.next()).done) {
             this.subscriptions.push(new CombineLatestItem(next.value, this));
         }
+        this.subscribeCount = options && options.emitUndefined ? this.subscriptions.length : 0;
         !this.subscriptions.length && on.end(null);
         for (var i = 0; i < this.subscriptions.length && this.state === RUNNING; i++) {
             this.subscriptions[i].do();
         }
     }
     CombineLatest.prototype = {
-        checkAllValues: function () {
-            for (var i = 0; i < this.subscriptions.length; i++) {
-                if (!this.subscriptions[i].hasValue) {
-                    return false;
-                }
-            }
-            return true;
-        },
         getValues: function () {
             var array = [];
             for (var i = 0; i < this.subscriptions.length; i++) {
@@ -81,11 +73,11 @@
         },
         emit: function (v) {
             this.value = v;
-            if (!this.on.hasAllValues && !this.hasValue) {
+            if (!this.hasValue) {
                 this.hasValue = true;
-                this.on.hasAllValues = this.on.checkAllValues();
+                this.on.subscribeCount++;
             }
-            if (this.on.hasAllValues) {
+            if (this.on.subscribeCount >= this.on.subscriptions.length) {
                 var array = this.on.getValues();
                 this.on.on.emit(this.on.mapper ? this.on.mapper.apply(null, array) : array);
             }
