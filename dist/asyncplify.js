@@ -557,6 +557,48 @@
         on.source = this;
     }
     Never.prototype.setState = noop;
+    Asyncplify.prototype.observeOn = function (options) {
+        return new Asyncplify(ObserveOn, options, this);
+    };
+    function ObserveOn(options, on, source) {
+        this.scheduler = (typeof options === 'function' ? options : options && options.scheduler || schedulers.immediate)();
+        this.scheduler.itemDone = this.scheduledItemDone.bind(this);
+        this.on = on;
+        this.source = null;
+        on.source = this;
+        source._subscribe(this);
+    }
+    ObserveOn.prototype = {
+        emit: function (v) {
+            this.scheduler.schedule(new ObserveOnItem(v, true, this.on));
+        },
+        end: function (err) {
+            this.scheduler.schedule(new ObserveOnItem(err, false, this.on));
+        },
+        scheduledItemDone: function (err) {
+            if (err) {
+                this.scheduler.setState(CLOSED);
+                this.on.end(err);
+            }
+        },
+        setState: function (state) {
+            if (this.state !== state && this.state !== CLOSED) {
+                this.state = state;
+                this.scheduler.setState(state);
+            }
+        }
+    };
+    function ObserveOnItem(value, isEmit, on) {
+        this.isEmit = isEmit;
+        this.on = on;
+        this.value = value;
+    }
+    ObserveOnItem.prototype = {
+        action: function () {
+            this.isEmit ? this.on.emit(this.value) : this.on.end(this.value);
+        },
+        delay: 0
+    };
     Asyncplify.prototype.pipe = function (func) {
         return func(this);
     };
@@ -1399,14 +1441,14 @@
         }
     };
     function immediateNextTickFactory(item) {
-        return item.dueTime && item.dueTime > new Date() ? new AbsoluteTimeoutItem(this, item.action, item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item.action, item.delay) : new NextTickItem(this, item.action);
+        return item.dueTime && item.dueTime > new Date() ? new AbsoluteTimeoutItem(this, item.action.bind(item), item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item.action.bind(item), item.delay) : new NextTickItem(this, item.action.bind(item));
     }
     function syncFactory(item) {
-        return item.dueTime && item.dueTime > new Date() ? new AbsoluteTimeoutItem(this, item.action, item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item.action, item.delay) : new SyncItem(this, item.action);
+        return item.dueTime && item.dueTime > new Date() ? new AbsoluteTimeoutItem(this, item.action.bind(item), item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item.action.bind(item), item.delay) : new SyncItem(this, item.action.bind(item));
     }
     var immediateFactory = typeof process !== 'undefined' && process.nextTick ? immediateNextTickFactory : timeoutFactory;
     function timeoutFactory(item) {
-        return item.dueTime ? new AbsoluteTimeoutItem(this, item.action, item.dueTime) : new RelativeTimeoutItem(this, item.action, item.delay);
+        return item.dueTime ? new AbsoluteTimeoutItem(this, item.action.bind(item), item.dueTime) : new RelativeTimeoutItem(this, item.action.bind(item), item.delay);
     }
     var schedulers = Asyncplify.schedulers = {
         immediate: function () {
