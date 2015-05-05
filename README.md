@@ -27,7 +27,7 @@ $ npm install asyncplify
 ```
 
 ## Documentation
-- [Book](http://xgrommx.github.io/asyncplify-book/) Thanks you xgrommx!
+- [Book](http://xgrommx.github.io/asyncplify-book/) Thanks to xgrommx!
 - [Performance](https://github.com/danylaporte/asyncplify/tree/master/perf)
 
 
