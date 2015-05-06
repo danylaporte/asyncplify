@@ -1,25 +1,13 @@
 var asyncplify = require('../dist/asyncplify');
-var assert = require('assert');
-var should = require('should');
+var common = require('./common');
 
 describe('fromNode', function () {
-    it('should return the data', function () {
-        var array = [];
-        var count = 0;
+    var source = asyncplify
+        .fromNode(function (cb) { cb(null, 10); });
 
-        asyncplify
-            .fromNode(function (cb) { cb(null, 10); })
-            .subscribe({
-                emit: function (value) {
-                    array.push(value);
-                },
-                end: function (err) {
-                    assert(err === null);
-                    count++;
-                }
-            });
-
-        array.should.eql([10]);
-        count.should.equal(1);
-    })
+    common.itShouldClose(source);
+    common.itShouldNotProduceAnError(source);
+    common.itShouldEndOnce(source);
+    common.itShouldEndSync(source);
+    common.itShouldEmitValues(source, [10]);
 })
