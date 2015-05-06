@@ -352,11 +352,11 @@
             this.resolved = 1;
             this.value = v;
             this.state === RUNNING && this.do();
-        }, function (err) {
+        }.bind(this), function (err) {
             this.resolved = 2;
             this.value = err;
             this.state === RUNNING && this.do();
-        });
+        }.bind(this));
     }
     FromPromise.prototype = {
         do: function () {
