@@ -1336,8 +1336,8 @@
         for (i = 0; i < items.length; i++) {
             this.subscriptions.push(new ZipItem(items[i], this));
         }
-        for (i = 0; i < this.subscriptions.length && this.state === RUNNING; i++) {
-            this.subscriptions[i].do();
+        for (i = 0; i < this.subscriptions.length; i++) {
+            this.subscriptions[i].setState(this.state);
         }
         !this.subscriptions.length && on.end(null);
     }
@@ -1359,9 +1359,6 @@
         this.state = PAUSED;
     }
     ZipItem.prototype = {
-        do: function () {
-            this.source ? this.source.setState(this.state) : this.item._subscribe(this);
-        },
         emit: function (v) {
             this.items.push(v);
             if (this.items.length === 1) {
@@ -1377,24 +1374,27 @@
                     array.push(subscriptions[i].items.splice(0, 1)[0]);
                 }
                 this.on.on.emit(this.on.mapper ? this.on.mapper.apply(null, array) : array);
+                for (i = 0; i < subscriptions.length; i++) {
+                    var s = subscriptions[i];
+                    if (s.state === CLOSED && !s.items.length) {
+                        this.on.setState(CLOSED);
+                        this.on.on.end(null);
+                        break;
+                    }
+                }
             }
         },
         end: function (err) {
             this.state = CLOSED;
-            if (!err) {
-                for (var i = 0; i < this.on.subscriptions.length; i++) {
-                    if (this.on.subscriptions[i].state !== CLOSED) {
-                        return;
-                    }
-                }
+            if (err || !this.items.length) {
+                this.on.setState(CLOSED);
+                this.on.on.end(err);
             }
-            this.on.setState(CLOSED);
-            this.on.on.end(err);
         },
         setState: function (state) {
             if (this.state !== state && this.state !== CLOSED) {
                 this.state = state;
-                state === RUNNING && this.do();
+                this.source ? this.source.setState(state) : state === RUNNING && this.item._subscribe(this);
             }
         }
     };

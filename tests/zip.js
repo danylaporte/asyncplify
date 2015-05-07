@@ -20,4 +20,7 @@ describe('zip', function () {
         });
         
     common.itShouldEmitValues(source, [{x: 0, y: 1}], 'should support a mapper');
+    
+    source = asyncplify.zip([asyncplify.range(4), asyncplify.interval(1)]);
+    common.itShouldEmitValues(source, [[0, 0], [1, 1], [2, 2], [3,3]], 'should finish with interval');
 })
