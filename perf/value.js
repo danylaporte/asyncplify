@@ -1,18 +1,13 @@
 var asyncplify = require('../dist/asyncplify');
 var rx = require('rx');
 
-module.exports = {
-    name: 'value',
-    tests: {
-        rx: {
-            fn: function () {
-                rx.Observable.return(10).subscribe(function () {});
-            }
-        },
-        asyncplify: {
-            fn: function () {
-                asyncplify.value(10).subscribe();
-            }
-        }
-    }
-};
+suite('value', function () {
+
+    test('asyncplify', function (done) {
+        asyncplify.value(10).subscribe(done);
+    });
+
+    test('rx', function (done) {
+        rx.Observable.return(10).subscribe(done);
+    });
+});

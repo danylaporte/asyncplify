@@ -15,7 +15,10 @@
     "async"
   ],
   "license": "MIT",
-  "repository": "danylaporte/asyncplify",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danylaporte/asyncplify.git"
+  },
   "dependencies": {},
   "devDependencies": {
     "bluebird": "^2.9.25",
@@ -27,7 +30,7 @@
     "gulp-spawn-mocha": "^2.0.1",
     "gulp-uglify": "^1.2.0",
     "gulp-wrap-js": "^0.2.1",
-    "mocha": "^2.2.4",
+    "mocha": "^2.2.5",
     "rx": "^2.5.2",
     "should": "^6.0.1",
     "source-map-support": "^0.2.10",

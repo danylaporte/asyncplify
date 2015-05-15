@@ -1,18 +1,12 @@
 var asyncplify = require('../dist/asyncplify');
 var rx = require('rx');
 
-module.exports = {
-    name: 'value',
-    tests: {
-        rx: {
-            fn: function () {
-                rx.Observable.range(0, 4).toArray().subscribe(function () {});
-            }
-        },
-        asyncplify: {
-            fn: function () {
-                asyncplify.range(4).toArray().subscribe();
-            }
-        }
-    }
-};
+suite('toArray', function () {
+    test('asyncplify', function (done) {
+        asyncplify.range(4).toArray().subscribe(done);
+    });
+
+    test('rx', function (done) {
+        rx.Observable.range(0, 4).toArray().subscribe(done);
+    });
+});
