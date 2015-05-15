@@ -17,7 +17,7 @@ gulp.task('js', function () {
 
 gulp.task('test', ['js'], function () {
     return gulp
-        .src(['./tests/**/*.js'])
+        .src(['./test/**/*.js'])
         .pipe(require('gulp-mocha')());
 });
 
