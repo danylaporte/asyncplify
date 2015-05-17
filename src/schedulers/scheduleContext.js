@@ -5,6 +5,16 @@ function ScheduleContext(factory) {
 }
 
 ScheduleContext.prototype = {
+    cancel: function (item) {
+        for (var i = 0; i < this.items.length; i++) {
+            var r = this.items[i];
+            if (r.item === item) {
+                this.items.splice(i, 0);
+                r.close();
+                break;
+            }
+        }
+    },
     schedule: function (item) {
         var scheduleItem = this.factory(item);
         this.items.push(scheduleItem);
@@ -28,7 +38,7 @@ ScheduleContext.prototype = {
 
             case PAUSED:
                 for (i = 0; i < this.items.length; i++) {
-                    this.items[i] = this.items[i].cancel();
+                    this.items[i] = this.items[i].pause();
                 }
                 break;
         }

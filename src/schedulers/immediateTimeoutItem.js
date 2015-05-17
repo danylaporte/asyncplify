@@ -1,13 +1,12 @@
-function AbsoluteTimeoutItem(context, item, dueTime) {
+function ImmediateTimeoutItem(context, item) {
     this.context = context;
-    this.dueTime = dueTime;
     this.handle = null;
     this.item = item;
 }
 
-AbsoluteTimeoutItem.prototype = {
+ImmediateTimeoutItem.prototype = {
     close: function () {
-        clearTimeout(this.handle);
+        clearImmediate(this.handle);
     },
     execute: function () {
         var err = null;
@@ -20,10 +19,10 @@ AbsoluteTimeoutItem.prototype = {
         this.context.itemDone(err);
     },
     pause: function () {
-        clearTimeout(this.handle);
+        clearImmediate(this.handle);
         return this;
     },
     schedule: function () {
-        this.handle = setTimeout(this.execute.bind(this), Math.max(this.dueTime - Date.now(), 0));
+        this.handle = setImmediate(this.execute.bind(this));
     }
 }

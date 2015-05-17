@@ -1,32 +1,32 @@
-function immediateNextTickFactory(item) {
-    return item.dueTime && item.dueTime > new Date()
-        ? new AbsoluteTimeoutItem(this, item.action.bind(item), item.dueTime)
+function immediateFactory(item) {
+    return item.dueTime && item.dueTime > Date.now()
+        ? new AbsoluteTimeoutItem(this, item, item.dueTime)
         : item.delay && item.delay > 0
-        ? new RelativeTimeoutItem(this, item.action.bind(item), item.delay)
-        : new NextTickItem(this, item.action.bind(item));
+            ? new RelativeTimeoutItem(this, item, item.delay)
+            : new ImmediateTimeoutItem(this, item);
 }
 
 function syncFactory(item) {
-    return item.dueTime && item.dueTime > new Date()
-        ? new AbsoluteTimeoutItem(this, item.action.bind(item), item.dueTime)
+    return item.dueTime && item.dueTime > Date.now()
+        ? new AbsoluteTimeoutItem(this, item, item.dueTime)
         : item.delay && item.delay > 0
-        ? new RelativeTimeoutItem(this, item.action.bind(item), item.delay)
-        : new SyncItem(this, item.action.bind(item));
+            ? new RelativeTimeoutItem(this, item, item.delay)
+            : new SyncItem(this, item);
 }
 
-var immediateFactory = typeof process !== 'undefined' && process.nextTick
-    ? immediateNextTickFactory
+var immediateOrTimeoutFactory = typeof setImmediate === 'function' && typeof clearImmediate === 'function'
+    ? immediateFactory
     : timeoutFactory;
 
 function timeoutFactory(item) {
     return item.dueTime
-        ? new AbsoluteTimeoutItem(this, item.action.bind(item), item.dueTime)
-        : new RelativeTimeoutItem(this, item.action.bind(item), item.delay);
+        ? new AbsoluteTimeoutItem(this, item, item.dueTime)
+        : new RelativeTimeoutItem(this, item, item.delay);
 }
 
 var schedulers = Asyncplify.schedulers = {
     immediate: function () {
-        return new ScheduleContext(immediateFactory);
+        return new ScheduleContext(immediateOrTimeoutFactory);
     },
     sync: function () {
         return new ScheduleContext(syncFactory);

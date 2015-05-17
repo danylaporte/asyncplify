@@ -1,18 +1,18 @@
-function SyncItem(context, action) {
-    this.action = action;
+function SyncItem(context, item) {
     this.context = context;
+    this.item = item;
 }
 
 SyncItem.prototype = {
-    cancel: function () {
+    close: noop,
+    pause: function () {
         return this;
     },
-    close: noop,
     schedule: function () {
         var err = null;
 
         try {
-            this.action();
+            this.item.action();
         } catch (ex) {
             err = ex;
         }
