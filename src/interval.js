@@ -3,16 +3,15 @@ Asyncplify.interval = function (options) {
 }
 
 function Interval(options, on) {
-    this.scheduler = options.scheduler || schedulers.timeout();
-    this.on = on;
-    this.state = RUNNING;
     this.i = 0;
-    this.itemPending = true;
-
     this.item = {
         action: noop,
-        delay: typeof options === 'number' ? options : options.delay || 0,
+        delay: options && options.delay || typeof options === 'number' && options || 0
     };
+    this.itemPending = true;
+    this.scheduler = (options && options.scheduler || schedulers.timeout)();
+    this.on = on;
+    this.state = RUNNING;
 
     on.source = this;
     this.scheduler.itemDone = this.scheduledItemDone.bind(this);
@@ -22,7 +21,7 @@ function Interval(options, on) {
 Interval.prototype = {
     scheduledItemDone: function (err) {
         this.itemPending = false;
-        
+
         if (this.err) {
             this.state = CLOSED;
             this.on.end(err);

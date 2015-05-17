@@ -6,7 +6,7 @@ var should = require('should');
 describe('interval', function () {
     it('should emit first value after a delay', function (done) {
         var count = 0;
-        var start = new Date();
+        var start = Date.now();
 
         asyncplify
             .interval(10)
@@ -16,7 +16,7 @@ describe('interval', function () {
                     v.should.equal(0);
                     count++;
 
-                    var delay = new Date() - start;
+                    var delay = Date.now() - start;
                     count.should.equal(1);
                     delay.should.be.approximately(10, 8);
 
