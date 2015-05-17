@@ -5,14 +5,7 @@ var assert = require('assert');
 
 exports.itShouldClose = function (source, title) {
     it(title || 'should close', function () {
-        var v = source.subscribe({
-            emit: function () { },
-            end: function (err) {
-                assert(err === null);
-            }
-        });
-
-        v.close();
+        source.subscribe().close();
     })
 }
 
@@ -74,6 +67,18 @@ exports.itShouldEndSync = function (source) {
 
         called.should.equal(true);
         done();
+    })
+}
+
+exports.itShouldEndWithError = function (source, error) {
+    it('should end with error', function (done) {
+        source.subscribe({
+            emit: function () { },
+            end: function (err) {
+                err.should.equal(error);
+                setTimeout(done, 0);
+            }
+        })
     })
 }
 

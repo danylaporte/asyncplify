@@ -1209,6 +1209,14 @@
             this.source.setState(state);
         }
     };
+    Asyncplify.throw = function (err, cb) {
+        return new Asyncplify(Throw, err);
+    };
+    function Throw(err, on) {
+        on.source = this;
+        on.end(err);
+    }
+    Throw.prototype.setState = noop;
     Asyncplify.prototype.toArray = function (options, source, cb) {
         return new Asyncplify(ToArray, options || EMPTYOBJ, this);
     };
