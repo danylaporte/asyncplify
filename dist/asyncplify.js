@@ -134,6 +134,67 @@
         },
         setState: setStateThru
     };
+    Asyncplify.prototype.debounce = function (options) {
+        return new Asyncplify(Debounce, options, this);
+    };
+    function Debounce(options, on, source) {
+        this.endCalled = false;
+        this.itemPending = false;
+        this.on = on;
+        this.scheduler = (options && options.scheduler || schedulers.timeout)();
+        this.source = null;
+        this.state = RUNNING;
+        this.value = null;
+        this.item = {
+            action: this.action.bind(this),
+            delay: options && options.delay || typeof options === 'number' && options || 0
+        };
+        on.source = this;
+        this.scheduler.itemDone = this.scheduledItemDone.bind(this);
+        source._subscribe(this);
+    }
+    Debounce.prototype = {
+        action: function () {
+            var v = this.value;
+            this.itemPending = false;
+            this.value = undefined;
+            this.on.emit(v);
+        },
+        emit: function (value) {
+            this.itemPending = true;
+            this.value = value;
+            this.scheduler.cancel(this.item);
+            this.scheduler.schedule(this.item);
+        },
+        end: function (err) {
+            this.endCalled = true;
+            if (err || !this.itemPending) {
+                this.state = CLOSED;
+                this.scheduler.close();
+                this.on.end(err);
+            }
+        },
+        scheduledItemDone: function (err) {
+            if (err || this.endCalled && this.state === RUNNING) {
+                this.state = CLOSED;
+                this.on.end(err);
+            }
+        },
+        setState: function (state) {
+            if (this.state !== state && this.state !== CLOSED) {
+                this.state = state;
+                this.source.setState(state);
+                if (state === RUNNING) {
+                    if (this.itemPending)
+                        this.scheduler.setState(this, state);
+                    else if (this.endCalled) {
+                        this.state = CLOSED;
+                        this.on.end(null);
+                    }
+                }
+            }
+        }
+    };
     Asyncplify.prototype.defaultIfEmpty = function (value) {
         return new Asyncplify(DefaultIfEmpty, value, this);
     };
@@ -445,15 +506,15 @@
         return new Asyncplify(Interval, options);
     };
     function Interval(options, on) {
-        this.scheduler = options.scheduler || schedulers.timeout();
-        this.on = on;
-        this.state = RUNNING;
         this.i = 0;
-        this.itemPending = true;
         this.item = {
             action: noop,
-            delay: typeof options === 'number' ? options : options.delay || 0
+            delay: options && options.delay || typeof options === 'number' && options || 0
         };
+        this.itemPending = true;
+        this.scheduler = (options && options.scheduler || schedulers.timeout)();
+        this.on = on;
+        this.state = RUNNING;
         on.source = this;
         this.scheduler.itemDone = this.scheduledItemDone.bind(this);
         this.scheduler.schedule(this.item);
@@ -1398,88 +1459,88 @@
             }
         }
     };
-    function AbsoluteTimeoutItem(context, action, dueTime) {
-        this.action = action;
+    function AbsoluteTimeoutItem(context, item, dueTime) {
         this.context = context;
         this.dueTime = dueTime;
         this.handle = null;
+        this.item = item;
     }
     AbsoluteTimeoutItem.prototype = {
-        cancel: function () {
-            cancelTimeout(this.handle);
-            return this;
-        },
         close: function () {
-            cancelTimeout(this.handle);
+            clearTimeout(this.handle);
         },
         execute: function () {
             var err = null;
             try {
-                this.action();
+                this.item.action();
             } catch (ex) {
                 err = ex;
             }
             this.context.itemDone(err);
         },
+        pause: function () {
+            clearTimeout(this.handle);
+            return this;
+        },
         schedule: function () {
-            this.handle = setTimeout(this.execute.bind(this), Math.max(this.dueTime - new Date(), 0));
+            this.handle = setTimeout(this.execute.bind(this), Math.max(this.dueTime - Date.now(), 0));
         }
     };
-    function NextTickItem(context, action) {
-        this.action = action;
-        this.canExecute = true;
+    function ImmediateTimeoutItem(context, item) {
         this.context = context;
+        this.handle = null;
+        this.item = item;
     }
-    NextTickItem.prototype = {
-        cancel: function () {
-            this.canExecute = false;
-            return new NextTickItem(this.context, this.do);
-        },
+    ImmediateTimeoutItem.prototype = {
         close: function () {
-            this.canExecute = false;
+            clearImmediate(this.handle);
         },
         execute: function () {
-            if (this.canExecute) {
-                var err = null;
-                try {
-                    this.action();
-                } catch (ex) {
-                    err = ex;
-                }
-                this.context.itemDone(err);
+            var err = null;
+            try {
+                this.item.action();
+            } catch (ex) {
+                err = ex;
             }
+            this.context.itemDone(err);
+        },
+        pause: function () {
+            clearImmediate(this.handle);
+            return this;
         },
         schedule: function () {
-            process.nextTick(this.execute.bind(this));
+            this.handle = setImmediate(this.execute.bind(this));
         }
     };
-    function RelativeTimeoutItem(context, action, delay) {
-        this.action = action;
+    function RelativeTimeoutItem(context, item, delay) {
         this.context = context;
         this.delay = delay || 0;
         this.handle = null;
-        this.scheduleTime = 0;
+        this.item = item;
+        this.scheduleTime = null;
+        this.accurate = null;
     }
     RelativeTimeoutItem.prototype = {
-        cancel: function () {
-            cancelTimeout(this.handle);
-            this.delay = Math.max(this.delay - new Date().valueOf() - this.scheduleTime, 0);
-            return this;
-        },
         close: function () {
-            cancelTimeout(this.handle);
+            clearTimeout(this.handle);
         },
         execute: function () {
             var err = null;
             try {
-                this.action();
+                this.item.action();
             } catch (ex) {
                 err = ex;
             }
             this.context.itemDone(err);
         },
+        pause: function () {
+            clearTimeout(this.handle);
+            this.delay = Math.max(this.delay - (Date.now() - this.scheduleTime), 0);
+            return this;
+        },
         schedule: function () {
-            this.scheduleTime = new Date().valueOf();
+            this.scheduleTime = Date.now();
+            this.accurate = process.hrtime();
             this.handle = setTimeout(this.execute.bind(this), this.delay);
         }
     };
@@ -1489,6 +1550,16 @@
         this.itemDone = null;
     }
     ScheduleContext.prototype = {
+        cancel: function (item) {
+            for (var i = 0; i < this.items.length; i++) {
+                var r = this.items[i];
+                if (r.item === item) {
+                    this.items.splice(i, 0);
+                    r.close();
+                    break;
+                }
+            }
+        },
         schedule: function (item) {
             var scheduleItem = this.factory(item);
             this.items.push(scheduleItem);
@@ -1510,25 +1581,25 @@
                 break;
             case PAUSED:
                 for (i = 0; i < this.items.length; i++) {
-                    this.items[i] = this.items[i].cancel();
+                    this.items[i] = this.items[i].pause();
                 }
                 break;
             }
         }
     };
-    function immediateNextTickFactory(item) {
-        return item.dueTime && item.dueTime > new Date() ? new AbsoluteTimeoutItem(this, item.action.bind(item), item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item.action.bind(item), item.delay) : new NextTickItem(this, item.action.bind(item));
+    function immediateFactory(item) {
+        return item.dueTime && item.dueTime > Date.now() ? new AbsoluteTimeoutItem(this, item, item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item, item.delay) : new ImmediateTimeoutItem(this, item);
     }
     function syncFactory(item) {
-        return item.dueTime && item.dueTime > new Date() ? new AbsoluteTimeoutItem(this, item.action.bind(item), item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item.action.bind(item), item.delay) : new SyncItem(this, item.action.bind(item));
+        return item.dueTime && item.dueTime > Date.now() ? new AbsoluteTimeoutItem(this, item, item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item, item.delay) : new SyncItem(this, item);
     }
-    var immediateFactory = typeof process !== 'undefined' && process.nextTick ? immediateNextTickFactory : timeoutFactory;
+    var immediateOrTimeoutFactory = typeof setImmediate === 'function' && typeof clearImmediate === 'function' ? immediateFactory : timeoutFactory;
     function timeoutFactory(item) {
-        return item.dueTime ? new AbsoluteTimeoutItem(this, item.action.bind(item), item.dueTime) : new RelativeTimeoutItem(this, item.action.bind(item), item.delay);
+        return item.dueTime ? new AbsoluteTimeoutItem(this, item, item.dueTime) : new RelativeTimeoutItem(this, item, item.delay);
     }
     var schedulers = Asyncplify.schedulers = {
         immediate: function () {
-            return new ScheduleContext(immediateFactory);
+            return new ScheduleContext(immediateOrTimeoutFactory);
         },
         sync: function () {
             return new ScheduleContext(syncFactory);
@@ -1537,19 +1608,19 @@
             return new ScheduleContext(timeoutFactory);
         }
     };
-    function SyncItem(context, action) {
-        this.action = action;
+    function SyncItem(context, item) {
         this.context = context;
+        this.item = item;
     }
     SyncItem.prototype = {
-        cancel: function () {
+        close: noop,
+        pause: function () {
             return this;
         },
-        close: noop,
         schedule: function () {
             var err = null;
             try {
-                this.action();
+                this.item.action();
             } catch (ex) {
                 err = ex;
             }
