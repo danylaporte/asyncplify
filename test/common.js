@@ -76,7 +76,7 @@ exports.itShouldEndWithError = function (source, error) {
             emit: function () { },
             end: function (err) {
                 err.should.equal(error);
-                setTimeout(done, 0);
+                done();
             }
         })
     })
