@@ -1,4 +1,4 @@
-Asyncplify.prototype.flatMap = function(options) {
+Asyncplify.prototype.flatMap = function (options) {
     return new Asyncplify(FlatMap, options, this)
 }
 
@@ -41,28 +41,13 @@ FlatMap.prototype = {
         err && this.setState(CLOSED);
         (err || !this.items.length) && this.on.end(err);
     },
-    setState: function (state) {        
+    setState: function (state) {
         this.source &&
-            (state !== RUNNING || !this.maxConcurrency || this.items.length < this.maxConcurrency) &&
-            this.source.setState(state);
+        (state !== RUNNING || !this.maxConcurrency || this.items.length < this.maxConcurrency) &&
+        this.source.setState(state);
 
         for (var i = 0; i < this.items.length; i++) {
             this.items[i].setState(state);
         }
     }
-}
-
-function FlatMapItem(on) {
-    this.on = on;
-    this.source = null;
-}
-
-FlatMapItem.prototype = {
-    emit: function (v) {
-        this.on.on.emit(v);
-    },
-    end: function (err) {
-        this.on.childEnd(err, this);
-    },
-    setState: setStateThru
 }
