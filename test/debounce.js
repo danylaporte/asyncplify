@@ -3,8 +3,8 @@ var common = require('./common');
 
 describe('debounce', function () {
     var source = asyncplify
-        .interval(2)
-        .debounce(5)
+        .interval(5)
+        .debounce(10)
 		.take(1);
 
     common.itShouldClose(source);
