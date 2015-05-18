@@ -37,7 +37,7 @@ Interval.prototype = {
             if (state === RUNNING) {
                 !this.itemPending && this.scheduler.schedule(this.item);
             } else {
-                this.scheduler.setState(this, state);
+                this.scheduler.setState(state);
             }
         }
     }

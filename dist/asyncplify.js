@@ -186,7 +186,7 @@
                 this.source.setState(state);
                 if (state === RUNNING) {
                     if (this.itemPending)
-                        this.scheduler.setState(this, state);
+                        this.scheduler.setState(state);
                     else if (this.endCalled) {
                         this.state = CLOSED;
                         this.on.end(null);
@@ -536,7 +536,7 @@
                 if (state === RUNNING) {
                     !this.itemPending && this.scheduler.schedule(this.item);
                 } else {
-                    this.scheduler.setState(this, state);
+                    this.scheduler.setState(state);
                 }
             }
         }

@@ -56,7 +56,7 @@ Debounce.prototype = {
 
             if (state === RUNNING) {
                 if (this.itemPending)
-                    this.scheduler.setState(this, state);
+                    this.scheduler.setState(state);
                 else if (this.endCalled) {
                     this.state = CLOSED;
                     this.on.end(null);
