@@ -1,7 +1,6 @@
 function ScheduleContext(factory) {
     this.factory = factory;
     this.items = [];
-    this.itemDone = null;
 }
 
 ScheduleContext.prototype = {
@@ -15,6 +14,7 @@ ScheduleContext.prototype = {
             }
         }
     },
+    itemDone: noop,
     schedule: function (item) {
         var scheduleItem = this.factory(item);
         this.items.push(scheduleItem);
