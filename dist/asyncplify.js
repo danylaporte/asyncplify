@@ -132,7 +132,7 @@
     var RUNNING = 0;
     var PAUSED = 1;
     var CLOSED = 2;
-    Asyncplify.state = {
+    Asyncplify.states = {
         RUNNING: RUNNING,
         PAUSED: PAUSED,
         CLOSED: CLOSED
@@ -429,36 +429,34 @@
         ]);
     };
     function FromNode(options, on) {
-        this.err = null;
+        this.error = null;
+        this.hasValue = false;
         this.on = on;
         this.state = RUNNING;
-        this.step = 0;
         this.value = null;
         on.source = this;
-        options[0].apply(options.self, options[1].concat(this.cb.bind(this)));
+        var self = this;
+        function callback(err, value) {
+            if (self.state === RUNNING) {
+                self.state = CLOSED;
+                if (!err)
+                    self.on.emit(value);
+                self.on.end(err);
+            } else {
+                self.hasValue = true;
+                self.value = value;
+                self.error = err;
+            }
+        }
+        options[0].apply(options.self, options[1].concat([callback]));
     }
     FromNode.prototype = {
-        cb: function (err, value) {
-            this.err = err;
-            this.step = 1;
-            this.value = value;
-            this.state === RUNNING && this.do();
-        },
         do: function () {
-            if (this.step !== 0) {
-                if (this.err) {
-                    this.state = CLOSED;
-                    this.on.end(this.err);
-                    return;
-                }
-                if (this.step === 1) {
-                    this.step = 2;
+            if (this.hasValue) {
+                this.state = CLOSED;
+                if (!this.error)
                     this.on.emit(this.value);
-                }
-                if (this.step === 2) {
-                    this.state = CLOSED;
-                    this.on.end(this.err);
-                }
+                this.on.end(this.error);
             }
         },
         setState: setState
