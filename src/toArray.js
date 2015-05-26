@@ -1,6 +1,6 @@
 Asyncplify.prototype.toArray = function (options, source, cb) {
-    return new Asyncplify(ToArray, options || EMPTYOBJ, this)
-}
+    return new Asyncplify(ToArray, options || {}, this);
+};
 
 function ToArray(options, on, source) {
     this.array = [];

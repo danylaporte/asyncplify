@@ -1,5 +1,5 @@
 Asyncplify.prototype.subscribe = function (options) {
-    return new Subscribe(options || EMPTYOBJ, this)
+    return new Subscribe(options || {}, this)
 }
 
 function Subscribe(options, source) {
