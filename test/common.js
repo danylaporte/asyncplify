@@ -14,7 +14,9 @@ exports.itShouldEmitValues = function (source, expected, title) {
         var array = [];
 
         source.subscribe({
-            emit: array.push.bind(array),
+            emit: function (value) {
+                array.push(value);
+            },
             end: function () {
                 array.should.eql(expected);
                 done();

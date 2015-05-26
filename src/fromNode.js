@@ -23,8 +23,8 @@ function FromNode(options, on) {
         if (self.state === RUNNING) {
             self.state = CLOSED;
             
-        if (!err) self.on.emit(value);
-            self.on.end(err);
+        if (!err) on.emit(value);
+            on.end(err);
         } else {
             self.hasValue = true;
             self.value = value;

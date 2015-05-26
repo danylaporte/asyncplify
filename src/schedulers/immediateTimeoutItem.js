@@ -23,6 +23,7 @@ ImmediateTimeoutItem.prototype = {
         return this;
     },
     schedule: function () {
-        this.handle = setImmediate(this.execute.bind(this));
+        var self = this;
+        this.handle = setImmediate(function () { self.execute(); });
     }
-}
+};

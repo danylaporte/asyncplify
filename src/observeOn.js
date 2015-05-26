@@ -3,8 +3,9 @@ Asyncplify.prototype.observeOn = function (options) {
 }
 
 function ObserveOn(options, on, source) {
+    var self = this;
     this.scheduler = (typeof options === 'function' ? options : (options && options.scheduler || schedulers.immediate))();
-    this.scheduler.itemDone = this.scheduledItemDone.bind(this);
+    this.scheduler.itemDone = function (err) { self.scheduledItemDone(err); };
     this.on = on;
     this.source = null;
 

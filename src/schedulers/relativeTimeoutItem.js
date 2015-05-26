@@ -4,7 +4,6 @@ function RelativeTimeoutItem(context, item, delay) {
     this.handle = null;
     this.item = item;
     this.scheduleTime = null;
-    this.accurate = null;
 }
 
 RelativeTimeoutItem.prototype = {
@@ -27,8 +26,8 @@ RelativeTimeoutItem.prototype = {
         return this;
     },
     schedule: function () {
+        var self = this;
         this.scheduleTime = Date.now();
-        this.accurate = process.hrtime();
-        this.handle = setTimeout(this.execute.bind(this), this.delay);
+        this.handle = setTimeout(function () { self.execute(); }, this.delay);
     }
-}
+};

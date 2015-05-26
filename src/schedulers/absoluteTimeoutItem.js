@@ -24,6 +24,7 @@ AbsoluteTimeoutItem.prototype = {
         return this;
     },
     schedule: function () {
-        this.handle = setTimeout(this.execute.bind(this), Math.max(this.dueTime - Date.now(), 0));
+        var self = this;
+        this.handle = setTimeout(function () { self.execute(); }, Math.max(this.dueTime - Date.now(), 0));
     }
-}
+};

@@ -14,7 +14,9 @@ function Interval(options, on) {
     this.state = RUNNING;
 
     on.source = this;
-    this.scheduler.itemDone = this.scheduledItemDone.bind(this);
+    var self = this;
+    
+    this.scheduler.itemDone = function (err) { self.scheduledItemDone(err); };     
     this.scheduler.schedule(this.item);
 }
 

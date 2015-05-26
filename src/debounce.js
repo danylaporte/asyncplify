@@ -11,13 +11,15 @@ function Debounce(options, on, source) {
     this.state = RUNNING;
     this.value = null;
 
+    var self = this;
+
     this.item = {
-        action: this.action.bind(this),
+        action: function () { self.action(); },
         delay: options && options.delay || typeof options === 'number' && options || 0,
     };
 
     on.source = this;
-    this.scheduler.itemDone = this.scheduledItemDone.bind(this);
+    this.scheduler.itemDone = function (err) { self.scheduledItemDone(err); };
     source._subscribe(this);
 }
 

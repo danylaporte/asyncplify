@@ -169,12 +169,17 @@
         this.source = null;
         this.state = RUNNING;
         this.value = null;
+        var self = this;
         this.item = {
-            action: this.action.bind(this),
+            action: function () {
+                self.action();
+            },
             delay: options && options.delay || typeof options === 'number' && options || 0
         };
         on.source = this;
-        this.scheduler.itemDone = this.scheduledItemDone.bind(this);
+        this.scheduler.itemDone = function (err) {
+            self.scheduledItemDone(err);
+        };
         source._subscribe(this);
     }
     Debounce.prototype = {
@@ -440,8 +445,8 @@
             if (self.state === RUNNING) {
                 self.state = CLOSED;
                 if (!err)
-                    self.on.emit(value);
-                self.on.end(err);
+                    on.emit(value);
+                on.end(err);
             } else {
                 self.hasValue = true;
                 self.value = value;
@@ -606,7 +611,10 @@
         this.on = on;
         this.state = RUNNING;
         on.source = this;
-        this.scheduler.itemDone = this.scheduledItemDone.bind(this);
+        var self = this;
+        this.scheduler.itemDone = function (err) {
+            self.scheduledItemDone(err);
+        };
         this.scheduler.schedule(this.item);
     }
     Interval.prototype = {
@@ -766,8 +774,11 @@
         return new Asyncplify(ObserveOn, options, this);
     };
     function ObserveOn(options, on, source) {
+        var self = this;
         this.scheduler = (typeof options === 'function' ? options : options && options.scheduler || schedulers.immediate)();
-        this.scheduler.itemDone = this.scheduledItemDone.bind(this);
+        this.scheduler.itemDone = function (err) {
+            self.scheduledItemDone(err);
+        };
         this.on = on;
         this.source = null;
         on.source = this;
@@ -1615,7 +1626,10 @@
             return this;
         },
         schedule: function () {
-            this.handle = setTimeout(this.execute.bind(this), Math.max(this.dueTime - Date.now(), 0));
+            var self = this;
+            this.handle = setTimeout(function () {
+                self.execute();
+            }, Math.max(this.dueTime - Date.now(), 0));
         }
     };
     function ImmediateTimeoutItem(context, item) {
@@ -1641,7 +1655,10 @@
             return this;
         },
         schedule: function () {
-            this.handle = setImmediate(this.execute.bind(this));
+            var self = this;
+            this.handle = setImmediate(function () {
+                self.execute();
+            });
         }
     };
     function RelativeTimeoutItem(context, item, delay) {
@@ -1650,7 +1667,6 @@
         this.handle = null;
         this.item = item;
         this.scheduleTime = null;
-        this.accurate = null;
     }
     RelativeTimeoutItem.prototype = {
         close: function () {
@@ -1671,9 +1687,11 @@
             return this;
         },
         schedule: function () {
+            var self = this;
             this.scheduleTime = Date.now();
-            this.accurate = process.hrtime();
-            this.handle = setTimeout(this.execute.bind(this), this.delay);
+            this.handle = setTimeout(function () {
+                self.execute();
+            }, this.delay);
         }
     };
     function ScheduleContext(factory) {
