@@ -1,4 +1,4 @@
-Asyncplify.value = function (value, cb) {
+Asyncplify.value = function (value) {
     return new Asyncplify(Value, value);
 };
 

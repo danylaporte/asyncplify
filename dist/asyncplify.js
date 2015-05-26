@@ -509,25 +509,21 @@
         return new Asyncplify(FromRx, obs);
     };
     function FromRx(obs, on) {
-        this.on = on;
         on.source = this;
-        this.subscription = obs.subscribe(this.next.bind(this), this.error.bind(this), this.completed.bind(this));
-    }
-    FromRx.prototype = {
-        completed: function () {
-            this.on.end(null);
-        },
-        error: function (err) {
-            this.on.end(err);
-        },
-        next: function (v) {
-            this.on.emit(v);
-        },
-        setState: function (state) {
-            if (state === CLOSED) {
-                this.subscription.dispose();
-            }
+        function next(value) {
+            on.emit(value);
         }
+        function error(err) {
+            on.end(err);
+        }
+        function completed() {
+            on.end(null);
+        }
+        this.subscription = obs.subscribe(next, error, completed);
+    }
+    FromRx.prototype.setState = function (state) {
+        if (state === CLOSED)
+            this.subscription.dispose();
     };
     Asyncplify.prototype.groupBy = function (options) {
         return new Asyncplify(GroupBy, options, this);
@@ -1510,7 +1506,7 @@
     function setStateThru(state) {
         this.source.setState(state);
     }
-    Asyncplify.value = function (value, cb) {
+    Asyncplify.value = function (value) {
         return new Asyncplify(Value, value);
     };
     function Value(value, on) {
