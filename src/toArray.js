@@ -12,18 +12,22 @@ function ToArray(options, on, source) {
     this.hasEmit = false;
     this.source = null;
 
-    if (options.split) {
-        if (typeof options.split === 'number') {
-            if (options.split > 0) {
-                this.splitLength = options.split;
-                this.emit = toArraySplitLength;
-            }
-        } else if (typeof options.split === 'function') {
-            this.splitCond = options.split;
+    var split = options && options.split || options;
+
+    switch (typeof split) {
+        case 'number':
+            this.splitLength = split;
+            this.emit = toArraySplitLength;
+            break;
+
+        case 'function':
+            this.splitCond = split;
             this.emit = toArraySplitCond;
-        } else if (options.split instanceof Asyncplify) {
-            new Trigger(options.split, this);
-        }
+            break;
+
+        case 'object':
+            if (split instanceof Asyncplify) new Trigger(split, this);
+            break;
     }
 
     on.source = this;
@@ -67,4 +71,4 @@ ToArray.prototype = {
     triggerEmit: function () {
         (this.array.length || this.emitEmpty) && this.emitArray();
     }
-}
+};
