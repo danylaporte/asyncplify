@@ -6,9 +6,7 @@ suite('count', function () {
         asyncplify.range(100).count().subscribe(done);
     });
 
-    /* There is an issue for this
     test('rx', function (done) {
         rx.Observable.range(0, 100).count().subscribe(done);
     });
-    */
 });
