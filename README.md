@@ -1,3 +1,5 @@
+[![npm version](https://badge.fury.io/js/asyncplify.svg)](http://badge.fury.io/js/asyncplify)
+
 # asyncplify
 FRP (functional reactive programming) library for Javascript.
 

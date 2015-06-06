@@ -21,8 +21,8 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "bluebird": "^2.9.26",
-    "gulp": "^3.8.11",
+    "bluebird": "^2.9.27",
+    "gulp": "^3.9.0",
     "gulp-bench": "^1.1.0",
     "gulp-concat": "^2.5.2",
     "gulp-mocha": "^2.1.0",
@@ -31,9 +31,9 @@
     "gulp-uglify": "^1.2.0",
     "gulp-wrap-js": "^0.2.1",
     "mocha": "^2.2.5",
-    "rx": "^2.5.2",
+    "rx": "^2.5.3",
     "should": "^6.0.3",
-    "source-map-support": "^0.2.10",
+    "source-map-support": "^0.3.1",
     "transducers-js": "^0.4.174"
   }
 }
