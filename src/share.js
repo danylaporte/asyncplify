@@ -1,7 +1,7 @@
-Asyncplify.prototype.publishRefCount = function (options) {
-    var r = new Asyncplify(PublishRefCount, null, this);
-    r.emit = publishRefCountEmit;
-    r.end = publishRefCountEnd;
+Asyncplify.prototype.share = function (options) {
+    var r = new Asyncplify(Share, null, this);
+    r.emit = shareCountEmit;
+    r.end = shareCountEnd;
     r.setState = setStateThru;
     r.refs = [];
     r._scheduler = options && options.scheduler && options.scheduler() || schedulers.sync();
@@ -9,13 +9,13 @@ Asyncplify.prototype.publishRefCount = function (options) {
     return r;
 }
 
-function publishRefCountEmit(value) {
+function shareCountEmit(value) {
     for (var i = 0; i < this.refs.length; i++) {
         this.refs[i].emit(value);
     }
 }
 
-function publishRefCountEnd(err) {
+function shareCountEnd(err) {
     var array = this.refs;
     this.refs = [];
 
@@ -24,7 +24,7 @@ function publishRefCountEnd(err) {
     }
 }
 
-function PublishRefCount(_, on, source, asyncplify) {
+function Share(_, on, source, asyncplify) {
     this.on = on;
     this.source = asyncplify;
 
@@ -40,7 +40,7 @@ function PublishRefCount(_, on, source, asyncplify) {
     }
 }
 
-PublishRefCount.prototype = {
+Share.prototype = {
     emit: emitThru,
     end: endThru,
     setState: function (state) {

@@ -3,8 +3,8 @@ var assert = require('assert');
 var common = require('./common');
 var should = require('should');
 
-describe('publishRefCount', function() {
-    var source = asyncplify.range(2).publishRefCount();
+describe('share', function() {
+    var source = asyncplify.range(2).share();
 
     common.itShouldClose(source);
     common.itShouldNotProduceAnError(source);
@@ -21,7 +21,7 @@ describe('publishRefCount', function() {
 
         var source = subject
             .tap(tapArray.push.bind(tapArray))
-            .publishRefCount();
+            .share();
 
         var s1 = source.subscribe(array1.push.bind(array1));
         var s2 = source.subscribe(array2.push.bind(array2));
