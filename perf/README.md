@@ -6,71 +6,72 @@ Stats are provided by [arewefaster](https://github.com/danylaporte/arewefaster)
 
 |name|time ± error margin|
 |---|-----|
-|asyncplify|41,601 ops ± 4.99%|
-|rx|2,086 ops ± 4.99%|
-asyncplify is 19.94x faster than rx
+|asyncplify|94,101 ops ± 4.99%|
+|rx|4,984 ops ± 4.99%|
+asyncplify is 18.88x faster than rx
 
 ###count
 
 |name|time ± error margin|
 |---|-----|
-|asyncplify|169,403 ops ± 4.99%|
-|rx|3,965 ops ± 4.99%|
-asyncplify is 42.72x faster than rx
+|asyncplify|321,256 ops ± 4.99%|
+|rx|10,735 ops ± 4.99%|
+asyncplify is 29.93x faster than rx
 
-###flatMap
+###map/filter
 
 |name|time ± error margin|
 |---|-----|
-|asyncplify|140,932 ops ± 4.99%|
-|rx|9,811 ops ± 4.99%|
-asyncplify is 14.36x faster than rx
+|asyncplify|376,832 ops ± 4.99%|
+|transducers-js|163,076 ops ± 4.99%|
+|rx|35,863 ops ± 4.99%|
+asyncplify is 2.31x faster than transducers-js
 
 ###fromNode
 
 |name|time ± error margin|
 |---|-----|
-|asyncplify|118,132 ops ± 4.99%|
-|bluebird|127,086 ops ± 5.15%|
-|rx|32,747 ops ± 8.99%|
-bluebird is 1.08x faster than asyncplify
+|asyncplify|187,435 ops ± 4.99%|
+|bluebird|87,162 ops ± 4.99%|
+|rx|29,769 ops ± 8.95%|
+asyncplify is 2.15x faster than bluebird
 
 ###merge
 
 |name|time ± error margin|
 |---|-----|
-|asyncplify|79,896 ops ± 4.99%|
-|rx|2,428 ops ± 4.99%|
-asyncplify is 32.91x faster than rx
+|asyncplify|169,451 ops ± 5.55%|
+|rx|4,618 ops ± 4.99%|
+asyncplify is 36.69x faster than rx
 
 ###sum
 
 |name|time ± error margin|
 |---|-----|
-|asyncplify|188,037 ops ± 4.99%|
-|rx|4,547 ops ± 4.94%|
-asyncplify is 41.35x faster than rx
+|asyncplify|289,467 ops ± 4.99%|
+|rx|8,347 ops ± 4.99%|
+asyncplify is 34.68x faster than rx
 
 ###toArray
 
 |name|time ± error margin|
 |---|-----|
-|asyncplify|254,874 ops ± 4.99%|
-|rx|47,370 ops ± 4.99%|
-asyncplify is 5.38x faster than rx
+|asyncplify|310,128 ops ± 4.99%|
+|rx|72,137 ops ± 4.99%|
+asyncplify is 4.3x faster than rx
 
 ###value
 
 |name|time ± error margin|
 |---|-----|
-|asyncplify|470,570 ops ± 4.99%|
-|rx|160,398 ops ± 4.99%|
-asyncplify is 2.93x faster than rx
+|asyncplify|396,539 ops ± 4.99%|
+|rx|183,070 ops ± 4.99%|
+asyncplify is 2.17x faster than rx
 
 ###zip
 
 |name|time ± error margin|
 |---|-----|
-|asyncplify|92,296 ops ± 4.99%|
-|rx|6,668 ops ± 4.99%|
-asyncplify is 13.84x faster than rx
+|asyncplify|96,263 ops ± 4.99%|
+|rx|12,895 ops ± 4.99%|
+asyncplify is 7.47x faster than rx
