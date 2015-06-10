@@ -1,3 +1,17 @@
+### defaultIfEmpty(value)
+Emit a value if the source has not emit one.
+If the value is not specified, it will emit undefined.
+
+Example:
+```js
+asyncplify
+	.empty()
+	.defaultIfEmpty(1)
+	.subscribe(console.log.bind(console));
+	// 1
+	// end.
+```
+
 ### empty()
 Returns a source with no items that terminate on subscribe.
 
