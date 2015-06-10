@@ -30,6 +30,7 @@ $ npm install asyncplify
 
 ## Documentation
 - [Book](http://xgrommx.github.io/asyncplify-book/) Thanks to xgrommx!
+- [Doc](https://github.com/danylaporte/asyncplify/tree/master/doc)
 - [Performance](https://github.com/danylaporte/asyncplify/tree/master/perf)
 
 
