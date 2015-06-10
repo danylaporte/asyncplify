@@ -1,3 +1,20 @@
+### debounce(options)
+Emit the most recent received item received after delay. 
+
+options:
+- delay Number default = 0
+- scheduler default = timeout
+
+Example:
+```js
+asyncplify
+	.fromArray([1, 2, 3])
+	.debounce(100)
+	.subscribe(console.log.bind(console));
+	// 3
+	// end.
+```
+
 ### defaultIfEmpty(value)
 Emit a value if the source has not emit one.
 If the value is not specified, it will emit undefined.
