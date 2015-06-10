@@ -1,0 +1,9 @@
+.npm-debug.log
+doc/
+perf/
+test/
+.git*
+.jshint*
+.npmignore
+CHANGELOG.*
+gulpfile.js
