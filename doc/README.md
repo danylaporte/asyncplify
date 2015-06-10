@@ -1,3 +1,29 @@
+### count(options)
+Returns the count based on a condition.
+
+options:
+- condition Function
+
+Example:
+```js
+asyncplify
+	.fromArray([1, 2, 4])
+	.count()
+	.subscribe(console.log.bind(console));
+	// 3
+	// end.
+```
+
+Example with a condition:
+```js
+asyncplify
+	.fromArray([1, 2, 4])
+	.count(function (x) { return x > 1; })
+	.subscribe(console.log.bind(console));
+	// 2
+	// end.
+```
+
 ### debounce(options)
 Emit the most recent received item received after delay. 
 
@@ -60,6 +86,29 @@ asyncplify
 	// 0
 	// 2
 	// 0
+	// 3
+	// end.
+```
+
+Example with maxConcurrency:
+```js
+asyncplify
+	.fromArray([1, 2, 3])
+	.flatMap({
+		mapper: function (x) {
+			return asyncplify
+				.interval()
+				.map(function () { return x; })
+				.take(2);
+		},
+		maxConcurrency: 1
+	})
+	.subscribe(console.log.bind(console));
+	// 1
+	// 1
+	// 2
+	// 2
+	// 3
 	// 3
 	// end.
 ```
