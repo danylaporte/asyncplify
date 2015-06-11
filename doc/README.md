@@ -112,3 +112,31 @@ asyncplify
 	// 3
 	// end.
 ```
+
+### Handle backpressure with Pause, Resume, Close
+Every subscription to asyncplify source can be paused, resume or close.
+
+
+```js
+var subscription = asyncplify
+    .fromArray([0, 1, 2, 3, 4])
+    .observeOn(asyncplify.schedulers.timeout)
+    .subscribe(function (x) {
+        console.log(x);
+        
+        if (x === 2) 
+            subscription.pause();
+    });
+
+setTimeout(function () {
+    subscription.resume();
+}, 1000);
+
+// 0
+// 1
+// 2
+// (will be paused for 1000 ms)
+// 3
+// 4
+// end.
+```
