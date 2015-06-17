@@ -1,18 +1,15 @@
 var asyncplify = require('../dist/asyncplify');
 var assert = require('assert');
-var common = require('./common');
 var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('skipUntil', function () {
-    var source = asyncplify
+    asyncplify
         .range(2)
-        .skipUntil(asyncplify.subject());
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, []);
+        .skipUntil(asyncplify.subject())
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([]));
 
     it('should returns the values after trigger is activated', function () {
         var array = [];
@@ -42,5 +39,5 @@ describe('skipUntil', function () {
         subject.end(null);
 
         array.should.eql([2, 3]);
-    })
-})
+    });
+});

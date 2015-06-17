@@ -1,18 +1,16 @@
 var asyncplify = require('../dist/asyncplify');
 var assert = require('assert');
-var common = require('./common');
 var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('merge', function () {
 
-    var source = asyncplify.merge([asyncplify.value(0), asyncplify.value(1)]);
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [0, 1]);
-
+    asyncplify
+        .merge([asyncplify.value(0), asyncplify.value(1)])
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([0, 1]));
+        
     it('support passing a maxConcurrency', function () {
         var count = 0;
         var array = [];
@@ -39,10 +37,9 @@ describe('merge', function () {
         subject.end();
         array.should.eql([1, 2]);
         count.should.equal(1);
-    })
+    });
     
-    source = asyncplify
-        .merge([asyncplify.value(0), asyncplify.interval(1)]);
-    
-    common.itShouldClose(source, 'should not throw on closing in child item');
-})
+    asyncplify
+        .merge([asyncplify.value(0), asyncplify.interval(1)])
+        .pipe(tests.itShouldClose({ title: 'should not throw on closing in child item'}));
+});

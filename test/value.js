@@ -1,12 +1,10 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var tests = require('asyncplify-tests');
 
 describe('value', function () {
-    var source = asyncplify.value(10);
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [10]);
-})
+    asyncplify
+        .value(10)
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([10]));
+});

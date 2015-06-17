@@ -1,13 +1,11 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var tests = require('asyncplify-tests');
 
 describe('throw', function () {
-    var error = new Error('error test');
-    var source = asyncplify.throw(error);
-
-    common.itShouldClose(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEndWithError(source, error);
-    common.itShouldEmitValues(source, []);
+    var error = 'error test';
+    
+    asyncplify
+        .throw(error)
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync({ error: error }));
 });

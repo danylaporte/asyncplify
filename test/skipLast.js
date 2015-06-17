@@ -1,14 +1,11 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var tests = require('asyncplify-tests');
 
 describe('skipLast', function () {
-    var source = asyncplify
+    asyncplify
         .range(4)
-        .skipLast(2);
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [0, 1]);
-})
+        .skipLast(2)
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([0, 1]));
+});

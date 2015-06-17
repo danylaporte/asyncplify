@@ -1,33 +1,41 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var tests = require('asyncplify-tests');
 
 describe('take', function () {
-    var source = asyncplify.range(10).take(2);
+    asyncplify
+        .range(10)
+        .take(2)
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues({
+            title: 'should take a count', 
+            values: [0, 1]
+        }));
 
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [0, 1], 'should take a count');
-
-    source = asyncplify
+    asyncplify
         .range(4)
-        .take(function (v) { return v > 1; });
-
-    common.itShouldEmitValues(source, [2, 3], 'should take a function');
-
-    source = asyncplify
+        .take(function (v) { return v > 1; })
+        .pipe(tests.itShouldEmitValues({
+            title: 'should take a function',
+            values: [2, 3]
+        }));
+        
+    asyncplify
         .range(4)
         .take({
             count: 1,
             cond: function (v) { return v > 1; }
-        });
+        })
+        .pipe(tests.itShouldEmitValues({
+            title: 'should take a cond and a count',
+            values: [2]
+        }));
 
-    common.itShouldEmitValues(source, [2], 'should take a function and a count');
-
-    source = asyncplify
+    asyncplify
         .range(4)
-        .take(0);
-
-    common.itShouldEmitValues(source, [], 'should not emit value when count is 0');
-})
+        .take(0)
+        .pipe(tests.itShouldEmitValues({
+            title: 'should not emit value when count is 0',
+            values: []
+        }));
+});

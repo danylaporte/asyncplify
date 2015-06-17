@@ -1,34 +1,17 @@
 var asyncplify = require('../dist/asyncplify');
-var assert = require('assert');
-var common = require('./common');
 var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('fromArray', function () {
-    var source = asyncplify.fromArray([0, 1]);
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [0, 1]);
-
-    it('should call end on empty array', function () {
-        var count = 0;
-
-        asyncplify
-            .fromArray([])
-            .subscribe({
-                emit: function (v) {
-                    assert(false);
-                },
-                end: function (err) {
-                    assert(err === null);
-                    count++;
-                }
-            });
-
-        count.should.equal(1);
-    })
+    asyncplify
+        .fromArray([0, 1])
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([0, 1]));
+        
+    asyncplify
+        .fromArray([])
+        .pipe(tests.itShouldEmitValues([]));
     
     it('should not loop infinitely when pausing / resuming', function (done) {
         asyncplify
@@ -49,6 +32,6 @@ describe('fromArray', function () {
             .subscribe(function(v) {
                 v.should.eql(['a', 'a', 'b']);
                 done();
-            })
-    })
-})
+            });
+    });
+});

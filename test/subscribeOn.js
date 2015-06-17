@@ -1,11 +1,11 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var tests = require('asyncplify-tests');
 
 describe('subscribeOn', function () {
-    var source = asyncplify.range(3).subscribeOn();
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndAsync(source);
-	common.itShouldEmitValues(source, [0, 1, 2]);
-})
+    asyncplify
+        .range(3)
+        .subscribeOn()
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndAsync())
+        .pipe(tests.itShouldEmitValues([0, 1, 2]));
+});

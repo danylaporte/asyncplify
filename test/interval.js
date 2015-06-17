@@ -1,7 +1,7 @@
 var asyncplify = require('../dist/asyncplify');
 var assert = require('assert');
-var common = require('./common');
 var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('interval', function () {
     it('should emit first value after a delay', function (done) {
@@ -26,15 +26,13 @@ describe('interval', function () {
                     count.should.equal(1);
                     done();
                 }
-            })
-    })
+            });
+    });
     
-    var source = asyncplify.interval(1).take(1);
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndAsync(source);
-    
-    source = asyncplify.interval(1).take(3);
-    common.itShouldEmitValues(source, [0, 1, 2]);
-})
+    asyncplify
+        .interval(1)
+        .take(3)
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndAsync())
+        .pipe(tests.itShouldEmitValues([0, 1, 2]));
+});

@@ -1,20 +1,22 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var tests = require('asyncplify-tests');
 
 describe('defaultIfEmpty', function () {
-    var source = asyncplify
+    asyncplify
         .empty()
-        .defaultIfEmpty(1);
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [1], 'should emit default value on empty');
-	
-	source = asyncplify
+        .defaultIfEmpty(1)
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues({
+            title: 'should emit default value on empty',
+            values: [1]
+        }));
+        
+    asyncplify
         .range(3)
-        .defaultIfEmpty(1);
-		
-	common.itShouldEmitValues(source, [0, 1, 2], 'should not emit default value on non-empty');
-})
+        .defaultIfEmpty(1)
+        .pipe(tests.itShouldEmitValues({
+            title: 'should not emit default value on non-empty',
+            values: [0, 1, 2]
+        }));
+});

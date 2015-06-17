@@ -1,41 +1,40 @@
 var asyncplify = require('../dist/asyncplify');
-var assert = require('assert');
-var common = require('./common');
-var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('scan', function(){
-    var source = asyncplify.range(3).scan();
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [0, 1, 3]);
+    asyncplify
+        .range(3)
+        .scan()
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([0, 1, 3]));
     
-    source = asyncplify
+    asyncplify
         .fromArray([1, 2])
-        .scan(function (acc, v) { return (acc + 1) * v });
-    
-    common.itShouldEmitValues(source, [1, 4], 'should support having a mapper');
-    
-    source = asyncplify
+        .scan(function (acc, v) { return (acc + 1) * v })
+        .pipe(tests.itShouldEmitValues({
+            title: 'should support a mapper',
+            values: [1, 4]
+        }));
+        
+    asyncplify
         .fromArray([1, 2])
-        .scan({ initial: 1 });
-    
-    common.itShouldEmitValues(source, [2, 4], 'should support having an initial value');
-    
-    source = asyncplify
-        .fromArray([1, 2])
-        .scan({ initial: 1 });
-    
-    source = asyncplify
+        .scan({ initial: 1 })
+        .pipe(tests.itShouldEmitValues({
+            title: 'should support having an initial value',
+            values: [2, 4]
+        }));
+        
+    asyncplify
         .range({start: 1, end: 4})
         .scan({
             initial: 1,
             mapper: function (acc, x) {
                 return acc * x;
             }
-        });
-    
-    common.itShouldEmitValues(source, [1, 2, 6], 'should support having an initial value with a mapper');
-})
+        })
+        .pipe(tests.itShouldEmitValues({
+            title: 'should support having an initial value with a mapper',
+            values: [1, 2, 6]
+        }));
+});

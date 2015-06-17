@@ -1,14 +1,11 @@
 var asyncplify = require('../dist/asyncplify');
-var assert = require('assert');
-var common = require('./common');
-var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('tap', function(){
-    var source = asyncplify.range(3).tap(function () { });
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [0, 1, 2]);
-})
+    asyncplify
+        .range(3)
+        .tap(function () { })
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([0, 1, 2]));
+});

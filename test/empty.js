@@ -1,21 +1,13 @@
 var asyncplify = require('../dist/asyncplify');
-var assert = require('assert');
-var common = require('./common');
-var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('empty', function () {
-    var source = asyncplify.empty();
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-
-    it('should not returns a value', function () {
-        asyncplify
-            .empty()
-            .subscribe(function () {
-                assert(false);
-            });
-    })
-})
+    asyncplify
+        .empty()
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues({
+            title: 'should not returns a value',
+            values: []
+        }));
+});

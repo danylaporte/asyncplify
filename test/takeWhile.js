@@ -1,14 +1,11 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var tests = require('asyncplify-tests');
 
 describe('takeWhile', function () {
-    var source = asyncplify
+    asyncplify
         .range(10)
-        .takeWhile(function (v) { return v < 2 });
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [0, 1]);
-})
+        .takeWhile(function (v) { return v < 2; })
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([0, 1]));
+});

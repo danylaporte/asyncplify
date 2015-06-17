@@ -1,21 +1,16 @@
 var asyncplify = require('../dist/asyncplify');
-var assert = require('assert');
-var common = require('./common');
-var should = require('should');
 var t = require('transducers-js');
+var tests = require('asyncplify-tests');
 
 describe('transduce', function(){
-    var source = asyncplify
+    asyncplify
 		.fromArray([1, 2, 3, 4, 5, 6])
 		.transduce(t.comp(
 			t.map(function (x) { return x + 10; }),
 			t.filter(function (x) { return x % 2 === 0; }),
 			t.take(2)
-		));
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [12, 14]);
-})
+		))
+		.pipe(tests.itShouldClose())
+		.pipe(tests.itShouldEndSync())
+		.pipe(tests.itShouldEmitValues([12, 14]));
+});

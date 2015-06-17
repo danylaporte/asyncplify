@@ -1,16 +1,14 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('finally', function () {
-    var source = asyncplify
+    asyncplify
         .range(2)
-        .finally(function () {  });
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [0, 1]);
+        .finally(function () {  })
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([0, 1]));
 
     it('should call action on close', function () {
         var count = 0;

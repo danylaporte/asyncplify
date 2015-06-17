@@ -1,22 +1,16 @@
 var asyncplify = require('../dist/asyncplify');
-var assert = require('assert');
-var common = require('./common');
-var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('flatMapLatest', function () {
-    var source = asyncplify
+    asyncplify
         .range(2)
-        .flatMapLatest(function (v) { return asyncplify.value(v); });
+        .flatMapLatest(function (v) { return asyncplify.value(v); })
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([0, 1]));
 
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [0, 1]);
-
-    source = asyncplify
+    asyncplify
         .range(2)
-        .flatMapLatest(function (v) { return asyncplify.value(v).observeOn(); });
-
-    common.itShouldEmitValues(source, [1]);
+        .flatMapLatest(function (v) { return asyncplify.value(v).observeOn(); })
+        .pipe(tests.itShouldEmitValues([1]));
 });

@@ -1,23 +1,21 @@
 var asyncplify = require('../dist/asyncplify');
-var assert = require('assert');
-var common = require('./common');
-var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('sum', function(){
-    var source = asyncplify.range(3).sum();
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [3]);
-
-    it('should support having a mapper',  function (done) {
-        asyncplify.fromArray([1, 2])
-            .sum(function (v) { return v + 2 })
-            .subscribe(function (v) {
-                v.should.equal(7);
-                done();
-            })
-    })
-})
+    asyncplify
+        .range(3)
+        .sum()
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([3]));
+        
+    asyncplify
+        .fromArray([1, 2])
+        .sum(function (v) { return v + 2; })
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues({
+            title: 'should support having a mapper',
+            values: [7]
+        }));
+});

@@ -1,28 +1,31 @@
 var asyncplify = require('../dist/asyncplify');
 var assert = require('assert');
-var common = require('./common');
 var should = require('should');
+var tests = require('asyncplify-tests');
 
 describe('toArray', function () {
-    var source = asyncplify.value(1).toArray();
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [[1]]);
+    asyncplify
+        .value(1)
+        .toArray()
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([[1]]));
     
-    source = asyncplify
+    asyncplify
         .range(4)
-        .toArray({ split: 2 });
-        
-    common.itShouldEmitValues(source, [[0,1], [2,3]], 'should allow to split at a length');
+        .toArray({ split: 2 })
+        .pipe(tests.itShouldEmitValues({
+            title: 'should allow to split at a length',
+            values: [[0,1], [2,3]]
+        }));
     
-    source = asyncplify
+    asyncplify
         .range(4)
-        .toArray({ split: function (x) { return x === 2 } });
-    
-    common.itShouldEmitValues(source, [[0,1], [2,3]], 'should allow to split by a condition');
+        .toArray({ split: function (x) { return x === 2 } })
+        .pipe(tests.itShouldEmitValues({
+            title: 'should allow to split by a condition',
+            values: [[0,1], [2,3]]
+        }));
 
     it('should allow to split by a trigger', function () {
         var count = 0;
@@ -53,5 +56,5 @@ describe('toArray', function () {
 
         array.should.eql([[0,1], [2,3]]);
         count.should.equal(1);
-    })
-})
+    });
+});

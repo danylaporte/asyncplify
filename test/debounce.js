@@ -1,15 +1,12 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var tests = require('asyncplify-tests');
 
 describe('debounce', function () {
-    var source = asyncplify
+    asyncplify
         .interval(5)
         .debounce(10)
-		.take(1);
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndAsync(source);
-    common.itShouldEmitValues(source, [2]);
-})
+		.take(1)
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndAsync())
+        .pipe(tests.itShouldEmitValues([2]));
+});

@@ -1,15 +1,12 @@
 var asyncplify = require('../dist/asyncplify');
-var common = require('./common');
+var tests = require('asyncplify-tests');
 
 describe('expand', function () {
-    var source = asyncplify
+    asyncplify
         .value(42)
         .expand(function (x) { return asyncplify.value(42 + x); })
-		.take(5);
-
-    common.itShouldClose(source);
-    common.itShouldNotProduceAnError(source);
-    common.itShouldEndOnce(source);
-    common.itShouldEndSync(source);
-    common.itShouldEmitValues(source, [42, 84, 126, 168, 210]);
+		.take(5)
+        .pipe(tests.itShouldClose())
+        .pipe(tests.itShouldEndSync())
+        .pipe(tests.itShouldEmitValues([42, 84, 126, 168, 210]));
 });
