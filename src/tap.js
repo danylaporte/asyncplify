@@ -4,6 +4,7 @@ Asyncplify.prototype.tap = function (options) {
 
 function Tap(options, on, source) {
     this._emit = options && options.emit || typeof options === 'function' && options || noop;
+    this.isSubscriberError = false;
     this.on = on;
     this.options = options;
     this.source = null;
@@ -15,11 +16,13 @@ function Tap(options, on, source) {
 
 Tap.prototype = {
     emit: function (value) {
+        this.isSubscriberError = true;
         this._emit(value);
         this.on.emit(value);
+        this.isSubscriberError = false;
     },
     end: function (err) {
-        if (this.options && this.options.end) this.options.end(err);
+        if (this.options && this.options.end) this.options.end(err, this.isSubscriberError);
         this.on.end(err);
     },
     setState: function (state) {

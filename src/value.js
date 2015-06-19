@@ -4,7 +4,12 @@ Asyncplify.value = function (value) {
 
 function Value(value, on) {
     on.source = this;
-    on.emit(value);
+    try {
+        on.emit(value);
+    } catch (ex) {
+        on.end(ex);
+        return;
+    }
     on.end(null);
 }
 

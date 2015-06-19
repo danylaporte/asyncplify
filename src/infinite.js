@@ -1,6 +1,6 @@
 Asyncplify.infinite = function () {
     return new Asyncplify(Infinite);
-}
+};
 
 function Infinite(_, on) {
 	this.on = on;
@@ -12,8 +12,21 @@ function Infinite(_, on) {
 
 Infinite.prototype = {
 	do: function () {
+		try {
+			this.doEmit();
+		} catch (ex) {
+			this.doEnd(ex);
+		}
+	},
+	doEmit: function () {
 		while (this.state === RUNNING) {
 			this.on.emit();
+		}
+	},
+	doEnd: function (error) {
+		if (this.state === RUNNING) {
+			this.state = CLOSED;
+			this.on.end(error);
 		}
 	},
     setState: function (state) {

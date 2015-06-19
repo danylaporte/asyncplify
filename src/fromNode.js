@@ -32,7 +32,11 @@ function FromNode(options, on) {
         }
     }
     
-    options[0].apply(options.self, options[1].concat([callback]));
+    try {
+        options[0].apply(options.self, options[1].concat([callback]));
+    } catch (ex) {
+        this.on.end(ex);
+    }
 }
 
 FromNode.prototype = {

@@ -23,6 +23,7 @@
     };
     function Catch(options, on, source) {
         this.i = 0;
+        this.isSubscriberError = false;
         this.on = on;
         this.options = options;
         this.source = null;
@@ -32,9 +33,13 @@
         source._subscribe(this);
     }
     Catch.prototype = {
-        emit: emitThru,
+        emit: function (value) {
+            this.isSubscriberError = true;
+            this.on.emit(value);
+            this.isSubscriberError = false;
+        },
         end: function (err) {
-            if (err) {
+            if (err && !this.isSubscriberError) {
                 var source = this.mapper(err);
                 if (source)
                     return source._subscribe(this);
@@ -526,12 +531,23 @@
     }
     FromArray.prototype = {
         do: function () {
+            try {
+                this.doEmit();
+            } catch (ex) {
+                this.doEnd(ex);
+                return;
+            }
+            this.doEnd(null);
+        },
+        doEmit: function () {
             while (this.i < this.array.length && this.state === RUNNING) {
                 this.on.emit(this.array[this.i++]);
             }
+        },
+        doEnd: function (error) {
             if (this.state === RUNNING) {
                 this.state = CLOSED;
-                this.on.end(null);
+                this.on.end(error);
             }
         },
         setState: setState
@@ -566,7 +582,11 @@
                 self.error = err;
             }
         }
-        options[0].apply(options.self, options[1].concat([callback]));
+        try {
+            options[0].apply(options.self, options[1].concat([callback]));
+        } catch (ex) {
+            this.on.end(ex);
+        }
     }
     FromNode.prototype = {
         do: function () {
@@ -698,8 +718,21 @@
     }
     Infinite.prototype = {
         do: function () {
+            try {
+                this.doEmit();
+            } catch (ex) {
+                this.doEnd(ex);
+            }
+        },
+        doEmit: function () {
             while (this.state === RUNNING) {
                 this.on.emit();
+            }
+        },
+        doEnd: function (error) {
+            if (this.state === RUNNING) {
+                this.state = CLOSED;
+                this.on.end(error);
             }
         },
         setState: function (state) {
@@ -945,14 +978,25 @@
     }
     Range.prototype = {
         do: function () {
+            try {
+                this.doEmit();
+            } catch (ex) {
+                this.doEnd(ex);
+                return;
+            }
+            this.doEnd(null);
+        },
+        doEmit: function () {
             while (this.i < this.end && this.state === RUNNING) {
                 var v = this.i;
                 this.i += this.step;
                 this.on.emit(v);
             }
+        },
+        doEnd: function (error) {
             if (this.state === RUNNING) {
                 this.state = CLOSED;
-                this.on.end(null);
+                this.on.end(error);
             }
         },
         setState: setState
@@ -1398,6 +1442,7 @@
     };
     function Tap(options, on, source) {
         this._emit = options && options.emit || typeof options === 'function' && options || noop;
+        this.isSubscriberError = false;
         this.on = on;
         this.options = options;
         this.source = null;
@@ -1411,12 +1456,14 @@
     }
     Tap.prototype = {
         emit: function (value) {
+            this.isSubscriberError = true;
             this._emit(value);
             this.on.emit(value);
+            this.isSubscriberError = false;
         },
         end: function (err) {
             if (this.options && this.options.end)
-                this.options.end(err);
+                this.options.end(err, this.isSubscriberError);
             this.on.end(err);
         },
         setState: function (state) {
@@ -1637,7 +1684,12 @@
     };
     function Value(value, on) {
         on.source = this;
-        on.emit(value);
+        try {
+            on.emit(value);
+        } catch (ex) {
+            on.end(ex);
+            return;
+        }
         on.end(null);
     }
     Value.prototype.setState = noop;
