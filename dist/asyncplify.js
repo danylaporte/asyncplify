@@ -1756,6 +1756,8 @@
             }
         },
         end: function (err) {
+            if (this.state === CLOSED)
+                return;
             this.state = CLOSED;
             if (err || !this.items.length) {
                 this.on.setState(CLOSED);

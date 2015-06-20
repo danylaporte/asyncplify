@@ -77,6 +77,7 @@ ZipItem.prototype = {
         }
     },
     end: function (err) {
+        if (this.state === CLOSED) return;
         this.state = CLOSED;
         
         if (err || !this.items.length) {
