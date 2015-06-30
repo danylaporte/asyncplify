@@ -5,15 +5,15 @@ Asyncplify.prototype.catch = function(options) {
 function Catch(options, sink, source) {
     this.i = 0;
     this.sink = sink;
+    this.sink.source = this;
     this.source = null;
     this.sources = null;
     
     if (typeof options === 'function')
         this.mapper = options;
     else
-        this.sources = Array.isArray(options) ? options [];
+        this.sources = Array.isArray(options) ? options : [];
     
-    sink.source = this;
     source._subscribe(this);
 }
         
@@ -21,8 +21,10 @@ Catch.prototype = {
     close: function() {
         this.sink = null;
         
-        if (this.source)
+        if (this.source) {
             this.source.close();
+            this.source = null;
+        }
     },
     emit: function(value) {
         if (this.sink)
@@ -39,7 +41,7 @@ Catch.prototype = {
         }
         
         if (this.sink) {
-            this.sink.end(null);
+            this.sink.end(err);
             this.sink = null;
         }
     },

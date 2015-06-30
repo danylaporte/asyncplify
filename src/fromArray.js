@@ -2,37 +2,16 @@ Asyncplify.fromArray = function (array) {
     return new Asyncplify(FromArray, array);
 };
 
-function FromArray(array, on) {
-    this.array = array;
-    this.i = 0;
-    this.state = RUNNING;
-    this.on = on;
-
-    on.source = this;
-    this.do();
+function FromArray(array, sink) {
+    this.sink = sink;
+    this.sink.source = this;
+    
+    for (var i = 0; i < array.length && this.sink; i++)
+        this.sink.emit(array[i]);
+        
+    if (this.sink) this.sink.end(null);
 }
 
-FromArray.prototype = {
-    do: function () {
-        try {
-            this.doEmit();
-        } catch (ex) {
-            this.doEnd(ex);
-            return;
-        }
-        
-        this.doEnd(null);
-    },
-    doEmit: function () {
-        while (this.i < this.array.length && this.state === RUNNING) {
-            this.on.emit(this.array[this.i++]);
-        }
-    },
-    doEnd: function (error) {
-        if (this.state === RUNNING) {
-            this.state = CLOSED;
-            this.on.end(error);
-        }
-    },
-    setState: setState
+FromArray.prototype.close = function () {
+    this.sink = null;
 };

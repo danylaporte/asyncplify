@@ -21,117 +21,122 @@
     Asyncplify.prototype.catch = function (options) {
         return new Asyncplify(Catch, options, this);
     };
-    function Catch(options, on, source) {
+    function Catch(options, sink, source) {
         this.i = 0;
-        this.isSubscriberError = false;
-        this.on = on;
-        this.options = options;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
+        this.sources = null;
         if (typeof options === 'function')
             this.mapper = options;
-        on.source = this;
+        else
+            this.sources = Array.isArray(options) ? options : [];
         source._subscribe(this);
     }
     Catch.prototype = {
+        close: function () {
+            this.sink = null;
+            if (this.source) {
+                this.source.close();
+                this.source = null;
+            }
+        },
         emit: function (value) {
-            this.isSubscriberError = true;
-            this.on.emit(value);
-            this.isSubscriberError = false;
+            if (this.sink)
+                this.sink.emit(value);
         },
         end: function (err) {
-            if (err && !this.isSubscriberError) {
+            this.source = null;
+            if (err && this.sink) {
                 var source = this.mapper(err);
-                if (source)
+                if (source && this.sink)
                     return source._subscribe(this);
             }
-            this.on.end(err);
+            if (this.sink) {
+                this.sink.end(err);
+                this.sink = null;
+            }
         },
         mapper: function () {
-            return this.i < this.options.length && this.options[this.i++];
-        },
-        setState: setStateThru
+            return this.i < this.sources.length && this.sources[this.i++];
+        }
     };
     Asyncplify.combineLatest = function (options) {
         return new Asyncplify(CombineLatest, options);
     };
-    function CombineLatest(options, on) {
+    function CombineLatest(options, sink) {
         this.mapper = options && options.mapper || null;
-        this.on = on;
-        this.state = RUNNING;
+        this.sink = sink;
         this.subscriptions = [];
-        on.source = this;
+        sink.source = this;
+        var i;
         var items = options && options.items || options;
-        if (!Array.isArray(items)) {
-            throw Error('items are not an array');
-        }
-        var next;
-        var iterator = new ArrayIterator(items);
-        while (!(next = iterator.next()).done) {
-            this.subscriptions.push(new CombineLatestItem(next.value, this));
-        }
+        for (i = 0; i < items.length; i++)
+            this.subscriptions.push(new CombineLatestItem(items[i], this));
         this.subscribeCount = options && options.emitUndefined ? this.subscriptions.length : 0;
-        !this.subscriptions.length && on.end(null);
-        for (var i = 0; i < this.subscriptions.length && this.state === RUNNING; i++) {
-            this.subscriptions[i].do();
-        }
+        !this.subscriptions.length && sink.end(null);
+        for (i = 0; i < this.subscriptions.length && this.sink; i++)
+            this.subscriptions[i].subscribe();
     }
     CombineLatest.prototype = {
+        close: function () {
+            if (this.sink) {
+                this.sink = null;
+                for (var i = 0; i < this.subscriptions.length; i++)
+                    this.subscriptions[i].close();
+            }
+        },
         getValues: function () {
             var array = [];
-            for (var i = 0; i < this.subscriptions.length; i++) {
+            for (var i = 0; i < this.subscriptions.length; i++)
                 array.push(this.subscriptions[i].value);
-            }
             return array;
-        },
-        setState: function (state) {
-            if (this.state !== state && this.state !== CLOSED) {
-                this.state = state;
-                for (var i = 0; i < this.subscriptions.length; i++) {
-                    this.subscriptions[i].setState(this.state);
-                }
-            }
         }
     };
-    function CombineLatestItem(item, on) {
+    function CombineLatestItem(item, parent) {
         this.hasValue = false;
         this.item = item;
-        this.on = on;
+        this.parent = parent;
         this.source = null;
-        this.state = RUNNING;
         this.value = undefined;
     }
     CombineLatestItem.prototype = {
-        do: function () {
-            this.source ? this.source.setState(this.state) : this.item._subscribe(this);
+        close: function () {
+            this.parent = null;
+            if (this.source)
+                this.source.close();
+            this.source = null;
         },
         emit: function (v) {
-            this.value = v;
-            if (!this.hasValue) {
-                this.hasValue = true;
-                this.on.subscribeCount++;
-            }
-            if (this.on.subscribeCount >= this.on.subscriptions.length) {
-                var array = this.on.getValues();
-                this.on.on.emit(this.on.mapper ? this.on.mapper.apply(null, array) : array);
+            if (this.parent && this.parent.sink) {
+                this.value = v;
+                if (!this.hasValue) {
+                    this.hasValue = true;
+                    this.parent.subscribeCount++;
+                }
+                if (this.parent.subscribeCount >= this.parent.subscriptions.length) {
+                    var array = this.parent.getValues();
+                    this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
+                }
             }
         },
         end: function (err) {
-            this.state = CLOSED;
-            if (!err) {
-                for (var i = 0; i < this.on.subscriptions.length; i++) {
-                    if (this.on.subscriptions[i].state !== CLOSED) {
-                        return;
-                    }
+            var parent = this.parent;
+            if (parent) {
+                this.parent = null;
+                if (!err)
+                    for (var i = 0; i < parent.subscriptions.length; i++)
+                        if (parent.subscriptions[i].parent)
+                            return;
+                var sink = parent.sink;
+                if (sink) {
+                    parent.close();
+                    sink.end(err);
                 }
             }
-            this.on.setState(CLOSED);
-            this.on.on.end(err);
         },
-        setState: function (state) {
-            if (this.state !== state && this.state !== CLOSED) {
-                this.state = state;
-                state === RUNNING && this.do();
-            }
+        subscribe: function () {
+            this.item._subscribe(this);
         }
     };
     var RUNNING = 0;
@@ -521,36 +526,16 @@
     Asyncplify.fromArray = function (array) {
         return new Asyncplify(FromArray, array);
     };
-    function FromArray(array, on) {
-        this.array = array;
-        this.i = 0;
-        this.state = RUNNING;
-        this.on = on;
-        on.source = this;
-        this.do();
+    function FromArray(array, sink) {
+        this.sink = sink;
+        this.sink.source = this;
+        for (var i = 0; i < array.length && this.sink; i++)
+            this.sink.emit(array[i]);
+        if (this.sink)
+            this.sink.end(null);
     }
-    FromArray.prototype = {
-        do: function () {
-            try {
-                this.doEmit();
-            } catch (ex) {
-                this.doEnd(ex);
-                return;
-            }
-            this.doEnd(null);
-        },
-        doEmit: function () {
-            while (this.i < this.array.length && this.state === RUNNING) {
-                this.on.emit(this.array[this.i++]);
-            }
-        },
-        doEnd: function (error) {
-            if (this.state === RUNNING) {
-                this.state = CLOSED;
-                this.on.end(error);
-            }
-        },
-        setState: setState
+    FromArray.prototype.close = function () {
+        this.sink = null;
     };
     Asyncplify.fromNode = function (func) {
         var args = [];
@@ -965,41 +950,21 @@
         return func(this);
     };
     Asyncplify.range = function (options) {
-        return new Asyncplify(Range, options);
+        return new Asyncplify(RangeOp, options);
     };
-    function Range(options, on) {
-        this.i = options && options.start || 0;
-        this.end = typeof options === 'number' ? options : options && options.end || 0;
-        this.step = options && options.step || 1;
-        this.state = RUNNING;
-        this.on = on;
-        on.source = this;
-        this.do();
+    function RangeOp(options, sink) {
+        var i = options && options.start || 0;
+        var end = typeof options === 'number' ? options : options && options.end || 0;
+        var step = options && options.step || 1;
+        this.sink = sink;
+        this.sink.source = this;
+        for (; i < end && this.sink; i += step)
+            this.sink.emit(i);
+        if (this.sink)
+            this.sink.end(null);
     }
-    Range.prototype = {
-        do: function () {
-            try {
-                this.doEmit();
-            } catch (ex) {
-                this.doEnd(ex);
-                return;
-            }
-            this.doEnd(null);
-        },
-        doEmit: function () {
-            while (this.i < this.end && this.state === RUNNING) {
-                var v = this.i;
-                this.i += this.step;
-                this.on.emit(v);
-            }
-        },
-        doEnd: function (error) {
-            if (this.state === RUNNING) {
-                this.state = CLOSED;
-                this.on.end(error);
-            }
-        },
-        setState: setState
+    RangeOp.prototype.close = function () {
+        this.sink = null;
     };
     /*Flow.prototype.recurse = function (options) {
     var produce = options.produce;
@@ -1288,23 +1253,28 @@
         }
     };
     Asyncplify.prototype.subscribe = function (options) {
-        return new Subscribe(options || {}, this);
+        return new Subscribe(options, this);
     };
     function Subscribe(options, source) {
-        this.emit = options.emit || typeof options === 'function' && options || noop;
-        this.end = options.end || noop;
+        if (options && options.emit)
+            this.emit = options.emit;
+        else if (typeof options === 'function')
+            this.emit = options;
+        if (options && options.end)
+            this.end = options.end;
         this.source = null;
         source._subscribe(this);
     }
     Subscribe.prototype = {
         close: function () {
-            this.source.setState(CLOSED);
+            if (this.source) {
+                this.source.close();
+                this.source = null;
+            }
         },
-        pause: function () {
-            this.source.setState(PAUSED);
+        emit: function () {
         },
-        resume: function () {
-            this.source.setState(RUNNING);
+        end: function () {
         }
     };
     Asyncplify.prototype.subscribeOn = function (options) {
@@ -1475,11 +1445,11 @@
     Asyncplify.throw = function (err, cb) {
         return new Asyncplify(Throw, err);
     };
-    function Throw(err, on) {
-        on.source = this;
-        on.end(err);
+    function Throw(err, sink) {
+        sink.end(err);
     }
-    Throw.prototype.setState = noop;
+    Throw.prototype.close = function () {
+    };
     Asyncplify.prototype.timeout = function (options) {
         return new Asyncplify(Timeout, options, this);
     };
@@ -1682,17 +1652,16 @@
     Asyncplify.value = function (value) {
         return new Asyncplify(Value, value);
     };
-    function Value(value, on) {
-        on.source = this;
-        try {
-            on.emit(value);
-        } catch (ex) {
-            on.end(ex);
-            return;
-        }
-        on.end(null);
+    function Value(value, sink) {
+        this.sink = sink;
+        this.sink.source = this;
+        this.sink.emit(value);
+        if (this.sink)
+            this.sink.end(null);
     }
-    Value.prototype.setState = noop;
+    Value.prototype.close = function () {
+        this.sink = null;
+    };
     Asyncplify.zip = function (options) {
         return new Asyncplify(Zip, options);
     };

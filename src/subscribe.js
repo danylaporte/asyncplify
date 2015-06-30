@@ -1,22 +1,29 @@
 Asyncplify.prototype.subscribe = function (options) {
-    return new Subscribe(options || {}, this)
-}
+    return new Subscribe(options, this);
+};
 
 function Subscribe(options, source) {
-    this.emit = options.emit || (typeof options === 'function' && options) || noop;
-    this.end = options.end || noop;
+    if (options && options.emit)
+        this.emit = options.emit;
+    else if (typeof options === 'function')
+        this.emit = options;
+        
+    if (options && options.end)
+        this.end = options.end;
+        
     this.source = null;
     source._subscribe(this);
 }
 
 Subscribe.prototype = {
     close: function () {
-        this.source.setState(CLOSED);
+        if (this.source) {
+            this.source.close();
+            this.source = null;
+        }
     },
-    pause: function () {
-        this.source.setState(PAUSED);
+    emit: function () {
     },
-    resume: function () {
-        this.source.setState(RUNNING);
+    end: function () {
     }
-}
+};

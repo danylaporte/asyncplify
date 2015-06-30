@@ -2,9 +2,9 @@ Asyncplify.throw = function (err, cb) {
     return new Asyncplify(Throw, err);
 };
 
-function Throw(err, on) {
-    on.source = this;
-    on.end(err);
+function Throw(err, sink) {
+    sink.end(err);
 }
 
-Throw.prototype.setState = noop;
+Throw.prototype.close = function () {
+};
