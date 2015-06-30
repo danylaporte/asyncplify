@@ -3,36 +3,47 @@ Asyncplify.prototype.catch = function(options) {
 };
 
 function Catch(options, sink, source) {
-    this._i = 0;
-    this._sink = sink;
-    this._source = null;
-    this._sources = null;
-    if(options && options._mapper) this._mapper = options._mapper;
-    else if(typeof options === 'function') this._mapper = options;
-    else this._sources = options && options.sources || Array.isArray(options) ? options : [];
-    sink._source = this;
+    this.i = 0;
+    this.sink = sink;
+    this.source = null;
+    this.sources = null;
+    
+    if (typeof options === 'function')
+        this.mapper = options;
+    else
+        this.sources = Array.isArray(options) ? options [];
+    
+    sink.source = this;
     source._subscribe(this);
 }
+        
 Catch.prototype = {
-    cancel: function() {
-        this._sink = null;
-        if(this._source) this._source.cancel();
+    close: function() {
+        this.sink = null;
+        
+        if (this.source)
+            this.source.close();
     },
     emit: function(value) {
-        if(this._sink) this._sink.emit(value);
+        if (this.sink)
+            this.sink.emit(value);
     },
     end: function(err) {
-        this._source = null;
-        if(err && this.sink) {
-            var source = this._mapper(err, this._sink);
-            if(source && this._sink) return source._subscribe(this);
+        this.source = null;
+        
+        if (err && this.sink) {
+            var source = this.mapper(err);
+            
+            if (source && this.sink)
+                return source._subscribe(this);
         }
-        if(this._sink) {
-            this._sink.end(null);
-            this._sink = null;
+        
+        if (this.sink) {
+            this.sink.end(null);
+            this.sink = null;
         }
     },
-    _mapper: function() {
-        return this._i < this._sources.length && this._sources[this._i++];
+    mapper: function() {
+        return this.i < this.sources.length && this.sources[this.i++];
     }
 };
