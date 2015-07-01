@@ -7,7 +7,7 @@ function Interval(options, sink) {
     
     this.i = 0;
     this.item = {
-        action: noop,
+        action: function () { self.action(); },
         delay: options && options.delay || typeof options === 'number' && options || 0,
         error: function (err) { self.handleError(err); }
     };
