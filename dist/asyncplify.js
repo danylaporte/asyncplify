@@ -65,40 +65,35 @@
         return new Asyncplify(CombineLatest, options);
     };
     function CombineLatest(options, sink) {
-        this.mapper = options && options.mapper || null;
-        this.sink = sink;
-        this.subscriptions = [];
-        sink.source = this;
-        var i;
         var items = options && options.items || options;
+        this.closableCount = items.length;
+        this.mapper = options && options.mapper || null;
+        this.missingValuesCount = options && options.emitUndefined ? 0 : items.length;
+        this.sink = sink;
+        this.sink.source = this;
+        this.subscriptions = [];
+        this.values = [];
+        var i;
         for (i = 0; i < items.length; i++)
-            this.subscriptions.push(new CombineLatestItem(items[i], this));
-        this.subscribeCount = options && options.emitUndefined ? this.subscriptions.length : 0;
-        !this.subscriptions.length && sink.end(null);
-        for (i = 0; i < this.subscriptions.length && this.sink; i++)
-            this.subscriptions[i].subscribe();
+            this.values.push(undefined);
+        for (i = 0; i < items.length; i++)
+            this.subscriptions.push(new CombineLatestItem(items[i], this, i));
+        if (!items.length)
+            this.sink.end(null);
     }
-    CombineLatest.prototype = {
-        close: function () {
-            if (this.sink) {
-                this.sink = null;
-                for (var i = 0; i < this.subscriptions.length; i++)
-                    this.subscriptions[i].close();
-            }
-        },
-        getValues: function () {
-            var array = [];
+    CombineLatest.prototype.close = function () {
+        if (this.sink) {
+            this.sink = null;
             for (var i = 0; i < this.subscriptions.length; i++)
-                array.push(this.subscriptions[i].value);
-            return array;
+                this.subscriptions[i].close();
         }
     };
-    function CombineLatestItem(item, parent) {
+    function CombineLatestItem(source, parent, index) {
         this.hasValue = false;
-        this.item = item;
+        this.index = index;
         this.parent = parent;
         this.source = null;
-        this.value = undefined;
+        source._subscribe(this);
     }
     CombineLatestItem.prototype = {
         close: function () {
@@ -109,34 +104,27 @@
         },
         emit: function (v) {
             if (this.parent && this.parent.sink) {
-                this.value = v;
+                this.parent.values[this.index] = v;
                 if (!this.hasValue) {
                     this.hasValue = true;
-                    this.parent.subscribeCount++;
+                    this.parent.missingValuesCount--;
                 }
-                if (this.parent.subscribeCount >= this.parent.subscriptions.length) {
-                    var array = this.parent.getValues();
+                if (this.parent.missingValuesCount <= 0) {
+                    var array = this.parent.values.slice();
                     this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
                 }
             }
         },
         end: function (err) {
-            var parent = this.parent;
-            if (parent) {
-                this.parent = null;
-                if (!err)
-                    for (var i = 0; i < parent.subscriptions.length; i++)
-                        if (parent.subscriptions[i].parent)
-                            return;
-                var sink = parent.sink;
-                if (sink) {
-                    parent.close();
-                    sink.end(err);
+            if (this.source) {
+                this.source = null;
+                this.parent.closableCount--;
+                if (err || !this.parent.closableCount) {
+                    this.parent.sink.end(err);
+                    if (err)
+                        this.parent.close();
                 }
             }
-        },
-        subscribe: function () {
-            this.item._subscribe(this);
         }
     };
     var RUNNING = 0;
