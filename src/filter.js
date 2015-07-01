@@ -8,19 +8,34 @@ Asyncplify.prototype.filter = function (cond) {
     return this;
 }
 
-function Filter(cond, on, source) {
+function Filter(cond, sink, source) {
     this.cond = cond;
-    this.on = on;
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
 
-    on.source = this;
     source._subscribe(this);
 }
 
 Filter.prototype = {
-    emit: function (value) {
-        this.cond(value) && this.on.emit(value);
+    close: function () {
+        this.sink = null;
+        
+        if (this.source)
+            this.source.close();
+            
+        this.source = null;  
     },
-    end: endThru,
-    setState: setStateThru
-}
+    emit: function (value) {
+        if (this.cond(value) && this.sink)
+            this.sink.emit(value);
+    },
+    end: function (err) {
+        this.source = null;
+        
+        if (this.sink)
+            this.sink.end(err);
+            
+        this.sink = null;
+    }
+};

@@ -2,8 +2,8 @@ Asyncplify.never = function () {
     return new Asyncplify(Never)
 }
 
-function Never(_, on) {
-    on.source = this;
+function Never(_, sink) {
+    sink.source = this;
 }
 
-Never.prototype.setState = noop;
+Never.prototype.close = noop;

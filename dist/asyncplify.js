@@ -275,8 +275,7 @@
         sink.source = this;
         sink.end(null);
     }
-    Empty.prototype.close = function () {
-    };
+    Empty.prototype.close = noop;
     Asyncplify.prototype.expand = function (selector) {
         return new Asyncplify(Expand, selector, this);
     };
@@ -369,41 +368,63 @@
             return new Asyncplify(Filter, condFalse, this);
         return this;
     };
-    function Filter(cond, on, source) {
+    function Filter(cond, sink, source) {
         this.cond = cond;
-        this.on = on;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        on.source = this;
         source._subscribe(this);
     }
     Filter.prototype = {
-        emit: function (value) {
-            this.cond(value) && this.on.emit(value);
+        close: function () {
+            this.sink = null;
+            if (this.source)
+                this.source.close();
+            this.source = null;
         },
-        end: endThru,
-        setState: setStateThru
+        emit: function (value) {
+            if (this.cond(value) && this.sink)
+                this.sink.emit(value);
+        },
+        end: function (err) {
+            this.source = null;
+            if (this.sink)
+                this.sink.end(err);
+            this.sink = null;
+        }
     };
     Asyncplify.prototype.finally = function (action) {
         return action ? new Asyncplify(Finally, action, this) : this;
     };
-    function Finally(action, on, source) {
+    function Finally(action, sink, source) {
         this.action = action;
-        this.on = on;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        this.state = RUNNING;
         this.registerProcessEnd(true);
-        on.source = this;
         source._subscribe(this);
     }
     Finally.prototype = {
-        emit: emitThru,
-        end: function (err) {
-            if (this.state !== CLOSED) {
-                this.state = CLOSED;
+        close: function () {
+            if (this.source) {
+                this.source.close();
+                this.source = null;
                 this.registerProcessEnd(false);
                 this.action();
-                this.on.end(err);
             }
+            this.sink = null;
+        },
+        emit: function (value) {
+            if (this.sink)
+                this.sink.emit(value);
+        },
+        end: function (err) {
+            this.source = null;
+            this.registerProcessEnd(false);
+            this.action();
+            if (this.sink)
+                this.sink.end(err);
+            this.sink = null;
         },
         registerProcessEnd: function (register) {
             if (typeof process === 'object') {
@@ -411,16 +432,6 @@
                 func('SIGINT', this.action);
                 func('SIGQUIT', this.action);
                 func('SIGTERM', this.action);
-            }
-        },
-        setState: function (state) {
-            if (this.state !== state && this.state !== CLOSED) {
-                this.state = state;
-                this.source.setState(state);
-                if (this.state === state && state === CLOSED) {
-                    this.registerProcessEnd(false);
-                    this.action();
-                }
             }
         }
     };
@@ -910,10 +921,10 @@
     Asyncplify.never = function () {
         return new Asyncplify(Never);
     };
-    function Never(_, on) {
-        on.source = this;
+    function Never(_, sink) {
+        sink.source = this;
     }
-    Never.prototype.setState = noop;
+    Never.prototype.close = noop;
     Asyncplify.prototype.observeOn = function (options) {
         return new Asyncplify(ObserveOn, options, this);
     };
