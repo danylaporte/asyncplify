@@ -8,44 +8,39 @@ Asyncplify.fromNode = function (func) {
     return new Asyncplify(FromNode, [func, args]);
 };
 
-function FromNode(options, on) {
-    this.error = null;
-    this.hasValue = false;
-    this.on = on;
-    this.state = RUNNING;
-    this.value = null;
-
-    on.source = this;
+function FromNode(options, sink) {
+    this.called = false;
+    this.sink = sink;
+    this.sink.source = this;
     
     var self = this;
     
     function callback(err, value) {
-        if (self.state === RUNNING) {
-            self.state = CLOSED;
+        if (!self.called) {
+            self.called = true;
             
-        if (!err) on.emit(value);
-            on.end(err);
-        } else {
-            self.hasValue = true;
-            self.value = value;
-            self.error = err;
+            if (self.sink && !err)
+                self.sink.emit(value);
+                
+            if (self.sink)
+                self.sink.end(err);
+                
+            self.sink = null;
         }
     }
     
     try {
-        options[0].apply(options.self, options[1].concat([callback]));
+        options[0].apply(null, options[1].concat([callback]));
     } catch (ex) {
-        this.on.end(ex);
+        this.called = true;
+        
+        if (this.sink)
+            this.sink.end(ex);
+        
+        this.sink = null;
     }
 }
 
-FromNode.prototype = {
-    do: function () {
-        if (this.hasValue) {
-            this.state = CLOSED;
-            if (!this.error) this.on.emit(this.value);
-            this.on.end(this.error);
-        }
-    },
-    setState: setState
+FromNode.prototype.close = function () {
+    this.sink = null;  
 };
