@@ -5,18 +5,5 @@ function SyncItem(context, item) {
 
 SyncItem.prototype = {
     close: noop,
-    pause: function () {
-        return this;
-    },
-    schedule: function () {
-        var err = null;
-
-        try {
-            this.item.action();
-        } catch (ex) {
-            err = ex;
-        }
-
-        this.context.itemDone(err);
-    }
-}
+    schedule: schedulerExecute
+};

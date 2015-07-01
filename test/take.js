@@ -14,25 +14,6 @@ describe('take', function () {
 
     asyncplify
         .range(4)
-        .take(function (v) { return v > 1; })
-        .pipe(tests.itShouldEmitValues({
-            title: 'should take a function',
-            values: [2, 3]
-        }));
-        
-    asyncplify
-        .range(4)
-        .take({
-            count: 1,
-            cond: function (v) { return v > 1; }
-        })
-        .pipe(tests.itShouldEmitValues({
-            title: 'should take a cond and a count',
-            values: [2]
-        }));
-
-    asyncplify
-        .range(4)
         .take(0)
         .pipe(tests.itShouldEmitValues({
             title: 'should not emit value when count is 0',

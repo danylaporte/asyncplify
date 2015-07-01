@@ -9,6 +9,4 @@ function Value(value, sink) {
     if (this.sink) this.sink.end(null);
 }
 
-Value.prototype.close = function () {
-    this.sink = null;
-};
+Value.prototype.close = closeSink;

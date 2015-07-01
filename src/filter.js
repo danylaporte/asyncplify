@@ -18,24 +18,10 @@ function Filter(cond, sink, source) {
 }
 
 Filter.prototype = {
-    close: function () {
-        this.sink = null;
-        
-        if (this.source)
-            this.source.close();
-            
-        this.source = null;  
-    },
+    close: closeSinkSource,
     emit: function (value) {
         if (this.cond(value) && this.sink)
             this.sink.emit(value);
     },
-    end: function (err) {
-        this.source = null;
-        
-        if (this.sink)
-            this.sink.end(err);
-            
-        this.sink = null;
-    }
+    end: endSinkSource
 };

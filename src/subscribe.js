@@ -22,8 +22,6 @@ Subscribe.prototype = {
             this.source = null;
         }
     },
-    emit: function () {
-    },
-    end: function () {
-    }
+    emit: noop,
+    end: noop
 };

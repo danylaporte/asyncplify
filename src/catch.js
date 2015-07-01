@@ -18,18 +18,8 @@ function Catch(options, sink, source) {
 }
         
 Catch.prototype = {
-    close: function() {
-        this.sink = null;
-        
-        if (this.source) {
-            this.source.close();
-            this.source = null;
-        }
-    },
-    emit: function(value) {
-        if (this.sink)
-            this.sink.emit(value);
-    },
+    close: closeSinkSource,
+    emit: emitThru,
     end: function(err) {
         this.source = null;
         

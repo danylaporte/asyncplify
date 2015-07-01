@@ -9,20 +9,7 @@ AbsoluteTimeoutItem.prototype = {
     close: function () {
         clearTimeout(this.handle);
     },
-    execute: function () {
-        var err = null;
-        try {
-            this.item.action();
-        } catch (ex) {
-            err = ex;
-        }
-
-        this.context.itemDone(err);
-    },
-    pause: function () {
-        clearTimeout(this.handle);
-        return this;
-    },
+    execute: schedulerExecute,
     schedule: function () {
         var self = this;
         this.handle = setTimeout(function () { self.execute(); }, Math.max(this.dueTime - Date.now(), 0));

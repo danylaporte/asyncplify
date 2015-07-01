@@ -41,6 +41,4 @@ function FromNode(options, sink) {
     }
 }
 
-FromNode.prototype.close = function () {
-    this.sink = null;  
-};
+FromNode.prototype.close = closeSink;

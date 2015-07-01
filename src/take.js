@@ -1,35 +1,36 @@
-Asyncplify.prototype.take = function (options) {
-    return new Asyncplify(Take, options, this)
-}
+Asyncplify.prototype.take = function (count) {
+    return new Asyncplify(count ? Take : Empty, count, this);
+};
 
-function Take(options, on, source) {
-    this.cond = condTrue;
-    this.count = -1;
-    this.on = on;
+function Take(count, sink, source) {
+    this.count = count;
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
-
-    setCountAndCond(this, options);
-
-    if (!this.count) {
-        this.on.end(null);
-    } else {
-        on.source = this;
-        source._subscribe(this);
-    }
+    
+    source._subscribe(this);
 }
 
 Take.prototype = {
+    close: closeSinkSource,
     emit: function (value) {
-        if (this.cond(value)) {
-            if (!--this.count) {
-                this.source.setState(CLOSED);
-                this.on.emit(value);
-                this.on.end(null);
-            } else {
-                this.on.emit(value);
+        if (this.count-- && this.sink) {
+            this.sink.emit(value);
+            
+            if (!this.count) {
+                var source = this.source;
+                var sink = this.sink;
+                
+                this.source = null;
+                this.sink = null;
+                
+                if (source)
+                    source.close();
+                    
+                if (sink)
+                    sink.end(null);
             }
         }
     },
-    end: endThru,
-    setState: setStateThru
-}
+    end: endSinkSource
+};

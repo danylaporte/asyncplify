@@ -3,9 +3,7 @@ Asyncplify.prototype.count = function (cond) {
 };
 
 function Count(cond, sink, source) {
-    if (cond)
-        this.cond = cond;
-
+    this.cond = cond || condTrue;
     this.sink = sink;
     this.sink.source = this;
     this.source = null;
@@ -15,17 +13,7 @@ function Count(cond, sink, source) {
 }
 
 Count.prototype = {
-    cond: function () {
-        return true;
-    },
-    close: function () {
-        this.sink = null;
-
-        if (this.source)
-            this.source.close();
-
-        this.source = null;
-    },
+    close: closeSinkSource,
     emit: function (value) {
         if (this.sink && this.cond(value))
             this.value++;

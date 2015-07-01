@@ -8,20 +8,7 @@ ImmediateTimeoutItem.prototype = {
     close: function () {
         clearImmediate(this.handle);
     },
-    execute: function () {
-        var err = null;
-        try {
-            this.item.action();
-        } catch (ex) {
-            err = ex;
-        }
-
-        this.context.itemDone(err);
-    },
-    pause: function () {
-        clearImmediate(this.handle);
-        return this;
-    },
+    execute: schedulerExecute,
     schedule: function () {
         var self = this;
         this.handle = setImmediate(function () { self.execute(); });

@@ -12,6 +12,4 @@ function FromArray(array, sink) {
     if (this.sink) this.sink.end(null);
 }
 
-FromArray.prototype.close = function () {
-    this.sink = null;
-};
+FromArray.prototype.close = closeSink;

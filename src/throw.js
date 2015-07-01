@@ -6,5 +6,4 @@ function Throw(err, sink) {
     sink.end(err);
 }
 
-Throw.prototype.close = function () {
-};
+Throw.prototype.close = noop;

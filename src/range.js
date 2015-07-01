@@ -16,6 +16,4 @@ function RangeOp(options, sink) {
     if (this.sink) this.sink.end(null);
 }
 
-RangeOp.prototype.close = function () {
-    this.sink = null;  
-};
+RangeOp.prototype.close = closeSink;

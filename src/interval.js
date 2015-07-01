@@ -1,46 +1,49 @@
 Asyncplify.interval = function (options) {
-    return new Asyncplify(Interval, options)
-}
+    return new Asyncplify(Interval, options);
+};
 
-function Interval(options, on) {
+function Interval(options, sink) {
+    var self = this;
+    
     this.i = 0;
     this.item = {
         action: noop,
-        delay: options && options.delay || typeof options === 'number' && options || 0
+        delay: options && options.delay || typeof options === 'number' && options || 0,
+        error: function (err) { self.handleError(err); }
     };
-    this.itemPending = true;
-    this.scheduler = (options && options.scheduler || schedulers.timeout)();
-    this.on = on;
-    this.state = RUNNING;
+    this.schedulerContext = (options && options.scheduler || schedulers.timeout)();
+    this.sink = sink;
+    this.sink.source = this;
 
-    on.source = this;
-    var self = this;
-    
-    this.scheduler.itemDone = function (err) { self.scheduledItemDone(err); };     
-    this.scheduler.schedule(this.item);
+    this.schedulerContext.schedule(this.item);
 }
 
 Interval.prototype = {
-    scheduledItemDone: function (err) {
-        this.itemPending = false;
-
-        if (this.err) {
-            this.state = CLOSED;
-            this.on.end(err);
-        } else {
-            this.on.emit(this.i++);
-            this.state === RUNNING && this.scheduler.schedule(this.item);
+    action: function () {
+        if (this.sink) {
+            this.sink.emit(this.i++);
+            
+            if (this.schedulerContext)
+                this.schedulerContext.schedule(this.item);
         }
     },
-    setState: function (state) {
-        if (this.state !== state && this.state !== CLOSED) {
-            this.state = state;
-
-            if (state === RUNNING) {
-                !this.itemPending && this.scheduler.schedule(this.item);
-            } else {
-                this.scheduler.setState(state);
+    close: function () {
+        this.sink = null;
+        
+        if (this.schedulerContext) {
+            this.schedulerContext.close();
+            this.schedulerContext = null;
+        }
+    },
+    handleError: function (err) {
+        if (this.schedulerContext) {
+            this.schedulerContext.close();
+            this.schedulerContext = null;
+            
+            if (this.sink) {
+                this.sink.end(err);
+                this.sink = null;
             }
         }
     }
-}
+};

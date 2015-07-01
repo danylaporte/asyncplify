@@ -1,3 +1,16 @@
+function closeSink() {
+    this.sink = null;
+}
+
+function closeSinkSource() {
+    this.sink = null;
+
+    if (this.source) {
+        this.source.close();
+        this.source = null;
+    }
+}
+
 function condTrue() {
     return true;
 }
@@ -7,11 +20,20 @@ function condFalse() {
 }
 
 function emitThru(value) {
-    this.on.emit(value);
+    if (this.sink)
+        this.sink.emit(value);
 }
 
-function endThru(err) {
-    this.on.end(err);
+function endThru() {
+    throw new Error('Deprecated');
+}
+
+function endSinkSource(err) {
+    if (this.source) {
+        this.source = null;
+        this.sink.end(err);
+        this.sink = null;
+    }
 }
 
 function identity(v) {

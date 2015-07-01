@@ -1,17 +1,17 @@
 Asyncplify.prototype.ignoreElements = function () {
-    return new Asyncplify(IgnoreElements, null, this)
-}
+    return new Asyncplify(IgnoreElements, null, this);
+};
 
-function IgnoreElements(_, on, source) {
-    this.on = on;
+function IgnoreElements(_, sink, source) {
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
 
-    on.source = this;
     source._subscribe(this);
 }
 
 IgnoreElements.prototype = {
+    close: closeSinkSource,
     emit: noop,
-    end: endThru,
-    setState: setStateThru
-}
+    end: endSinkSource
+};

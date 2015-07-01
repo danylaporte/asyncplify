@@ -1,3 +1,12 @@
+function schedulerExecute() {
+    removeItem(this.context.items, this);    
+    try {
+        this.item.action();
+    } catch (ex) {
+        this.item.error(ex);
+    }
+}
+
 function immediateFactory(item) {
     return item.dueTime && item.dueTime > Date.now()
         ? new AbsoluteTimeoutItem(this, item, item.dueTime)
@@ -34,4 +43,4 @@ var schedulers = Asyncplify.schedulers = {
     timeout: function () {
         return new ScheduleContext(timeoutFactory);
     }
-}
+};
