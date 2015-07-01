@@ -1,10 +1,10 @@
 Asyncplify.empty = function () {
-    return new Asyncplify(Empty)
+    return new Asyncplify(Empty);
+};
+
+function Empty(_, sink) {
+    sink.source = this;
+    sink.end(null);
 }
 
-function Empty(_, on) {
-    on.source = this;
-    on.end(null);
-}
-
-Empty.prototype.setState = noop;
+Empty.prototype.close = function () { };

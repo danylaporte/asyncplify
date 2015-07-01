@@ -239,33 +239,44 @@
     Asyncplify.prototype.defaultIfEmpty = function (value) {
         return new Asyncplify(DefaultIfEmpty, value, this);
     };
-    function DefaultIfEmpty(value, on, source) {
+    function DefaultIfEmpty(value, sink, source) {
         this.hasValue = false;
-        this.on = on;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
         this.value = value;
-        on.source = this;
         source._subscribe(this);
     }
     DefaultIfEmpty.prototype = {
+        close: function () {
+            this.sink = null;
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: function (value) {
             this.hasValue = true;
-            this.on.emit(value);
+            if (this.sink)
+                this.sink.emit(value);
         },
         end: function (err) {
-            !err && !this.hasValue && this.on.emit(this.value);
-            this.on.end(err);
-        },
-        setState: setStateThru
+            this.source = null;
+            if (!this.hasValue && !err && this.sink)
+                this.sink.emit(this.value);
+            if (this.sink)
+                this.sink.end(err);
+            this.sink = null;
+        }
     };
     Asyncplify.empty = function () {
         return new Asyncplify(Empty);
     };
-    function Empty(_, on) {
-        on.source = this;
-        on.end(null);
+    function Empty(_, sink) {
+        sink.source = this;
+        sink.end(null);
     }
-    Empty.prototype.setState = noop;
+    Empty.prototype.close = function () {
+    };
     Asyncplify.prototype.expand = function (selector) {
         return new Asyncplify(Expand, selector, this);
     };
