@@ -39,11 +39,10 @@ Finally.prototype = {
     },
     registerProcessEnd: function (register) {
         if (typeof process === 'object') {
-            var func = process[register ? 'on' : 'removeListener'];
-        
-            func('SIGINT', this.action);
-            func('SIGQUIT', this.action);
-            func('SIGTERM', this.action);
+            var n = register ? 'on' : 'removeListener';
+            process[n]('SIGINT', this.action);
+            process[n]('SIGQUIT', this.action);
+            process[n]('SIGTERM', this.action);
         }
     }
 };
