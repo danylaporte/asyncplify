@@ -1,25 +1,35 @@
 Asyncplify.prototype.subscribeOn = function (options) {
-    return new Asyncplify(SubscribeOn, options, this)
-}
+    return new Asyncplify(SubscribeOn, options, this);
+};
 
-function SubscribeOn(options, on, source) {
+function SubscribeOn(options, sink, source) {
     this.origin = source;
-    this.on = on;
-    this.scheduler = (typeof options === 'function' ? options : (options && options.scheduler || schedulers.immediate))();
-    this.scheduler.itemDone = noop;
+    this.sink = sink;
+    this.sink.source = this;
+    this.schedulerContext = (typeof options === 'function' ? options : (options && options.scheduler || schedulers.immediate))();
     this.source = null;
 
-    on.source = this;
-	this.scheduler.schedule(this);
+    this.schedulerContext.schedule(this);
 }
 
 SubscribeOn.prototype = {
     action: function () {
-        this.origin._subscribe(this);  
+        this.closeSchedulerContext();
+        this.origin._subscribe(this);
     },
+    close: function () {
+        this.closeSchedulerContext();
+        this.closeSource();
+        this.sink = null;
+    },
+    closeSchedulerContext: closeSchedulerContext,
+    closeSource: closeSource,
     emit: emitThru,
-    end: endThru,
-    setState: function (state) {
-		this.source ? this.source.setState(state) : this.scheduler.setState(state);
+    end: endSinkSource,
+    endSink: endSink,
+    error: function (err) {
+        this.closeSchedulerContext();
+        this.closeSource();
+        this.endSink(err);
     }
-}
+};

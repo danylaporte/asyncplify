@@ -1247,23 +1247,33 @@
     Asyncplify.prototype.subscribeOn = function (options) {
         return new Asyncplify(SubscribeOn, options, this);
     };
-    function SubscribeOn(options, on, source) {
+    function SubscribeOn(options, sink, source) {
         this.origin = source;
-        this.on = on;
-        this.scheduler = (typeof options === 'function' ? options : options && options.scheduler || schedulers.immediate)();
-        this.scheduler.itemDone = noop;
+        this.sink = sink;
+        this.sink.source = this;
+        this.schedulerContext = (typeof options === 'function' ? options : options && options.scheduler || schedulers.immediate)();
         this.source = null;
-        on.source = this;
-        this.scheduler.schedule(this);
+        this.schedulerContext.schedule(this);
     }
     SubscribeOn.prototype = {
         action: function () {
+            this.closeSchedulerContext();
             this.origin._subscribe(this);
         },
+        close: function () {
+            this.closeSchedulerContext();
+            this.closeSource();
+            this.sink = null;
+        },
+        closeSchedulerContext: closeSchedulerContext,
+        closeSource: closeSource,
         emit: emitThru,
-        end: endThru,
-        setState: function (state) {
-            this.source ? this.source.setState(state) : this.scheduler.setState(state);
+        end: endSinkSource,
+        endSink: endSink,
+        error: function (err) {
+            this.closeSchedulerContext();
+            this.closeSource();
+            this.endSink(err);
         }
     };
     Asyncplify.prototype.sum = function (mapper, source, cb) {
@@ -1425,26 +1435,22 @@
         return new Asyncplify(Timeout, options, this);
     };
     function Timeout(options, sink, source) {
-        var self = this;
-        var other = options instanceof Asyncplify ? options : options && options.other || Asyncplify.throw(new Error('Timeout'));
+        this.delay = typeof options === 'number' ? options : options && options.delay || 0;
+        this.dueTime = options instanceof Date ? options : options && options.dueTime;
+        this.other = options instanceof Asyncplify ? options : options && options.other || Asyncplify.throw(new Error('Timeout'));
         this.schedulerContext = (options && options.scheduler || schedulers.timeout)();
         this.sink = sink;
         this.sink.source = this;
         this.source = null;
-        this.schedulerContext.schedule({
-            action: function () {
-                self.closeSource();
-                other._subscribe(self);
-            },
-            delay: typeof options === 'number' ? options : options && options.delay || 0,
-            dueTime: options instanceof Date ? options : options && options.dueTime,
-            error: function (err) {
-                self.error(err);
-            }
-        });
+        this.schedulerContext.schedule(this);
         source._subscribe(this);
     }
     Timeout.prototype = {
+        action: function () {
+            this.closeSource();
+            this.closeSchedulerContext();
+            this.other._subscribe(this);
+        },
         close: function () {
             this.sink = null;
             this.closeSource();
@@ -1458,14 +1464,14 @@
         },
         end: function (err) {
             this.source = null;
-            this.endSink(err);
             this.closeSchedulerContext();
+            this.endSink(err);
         },
         endSink: endSink,
         error: function (err) {
             this.closeSource();
-            this.endSink(err);
             this.closeSchedulerContext();
+            this.endSink(err);
         }
     };
     Asyncplify.prototype.toArray = function (options, source, cb) {
@@ -1570,11 +1576,16 @@
         source._subscribe(this);
     }
     Trigger.prototype = {
-        emit: function (value) {
-            this.target.triggerEmit(value);
+        close: function () {
+            this.closeSource();
+            this.target = null;
         },
-        end: noop,
-        setState: setStateThru
+        closeSource: closeSource,
+        emit: function (value) {
+            if (this.target)
+                this.target.triggerEmit(value);
+        },
+        end: noop
     };
     function closeSchedulerContext() {
         var schedulerContext = this.schedulerContext;
@@ -1621,11 +1632,8 @@
         throw new Error('Deprecated');
     }
     function endSinkSource(err) {
-        if (this.source) {
-            this.source = null;
-            this.sink.end(err);
-            this.sink = null;
-        }
+        this.source = null;
+        this.endSink(err);
     }
     function identity(v) {
         return v;

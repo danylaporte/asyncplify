@@ -52,11 +52,8 @@ function endThru() {
 }
 
 function endSinkSource(err) {
-    if (this.source) {
-        this.source = null;
-        this.sink.end(err);
-        this.sink = null;
-    }
+    this.source = null;
+    this.endSink(err);
 }
 
 function identity(v) {
