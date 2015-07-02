@@ -2,44 +2,49 @@ Asyncplify.prototype.timeout = function (options) {
     return new Asyncplify(Timeout, options, this);
 }
 
-function Timeout(options, on, source) {
+function Timeout(options, sink, source) {
     var self = this;
     var other = options instanceof Asyncplify ? options : (options && options.other || Asyncplify.throw(new Error('Timeout')));
 
-    this.on = on;
-    this.scheduler = (options && options.scheduler || schedulers.timeout)();
+    this.schedulerContext = (options && options.scheduler || schedulers.timeout)();
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
 
-    on.source = this;
-
-    this.scheduler.schedule({
+    this.schedulerContext.schedule({
         action: function () {
-            self.source.setState(CLOSED);
+            self.closeSource();
             other._subscribe(self);
         },
         delay: typeof options === 'number' ? options : options && options.delay || 0,
-        dueTime: options instanceof Date ? options : options && options.dueTime
+        dueTime: options instanceof Date ? options : options && options.dueTime,
+        error: function (err) { self.error(err); }
     });
+    
     source._subscribe(this);
 }
 
 Timeout.prototype = {
-    closeScheduler: function () {
-        if (this.scheduler) {
-            this.scheduler.setState(CLOSED);
-            this.scheduler = null;
-        }
+    close: function () {
+        this.sink = null;
+        this.closeSource();
+        this.closeSchedulerContext();  
     },
+    closeSource: closeSource,
+    closeSchedulerContext: closeSchedulerContext,
     emit: function (value) {
-        this.closeScheduler();
-        this.on.emit(value);
+        this.closeSchedulerContext();
+        this.sink.emit(value);
     },
     end: function (err) {
-        this.closeScheduler();
-        this.on.end(err);
+        this.source = null;
+        this.endSink(err);
+        this.closeSchedulerContext();
     },
-    setState: function (state) {
-        this.scheduler && this.scheduler.setState(state);
-        this.source.setState(state);
+    endSink: endSink,
+    error: function (err) {
+        this.closeSource();
+        this.endSink(err);
+        this.closeSchedulerContext();
     }
-}
+};

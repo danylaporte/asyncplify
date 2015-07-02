@@ -714,7 +714,7 @@
             },
             delay: options && options.delay || typeof options === 'number' && options || 0,
             error: function (err) {
-                self.handleError(err);
+                self.error(err);
             }
         };
         this.schedulerContext = (options && options.scheduler || schedulers.timeout)();
@@ -732,20 +732,13 @@
         },
         close: function () {
             this.sink = null;
-            if (this.schedulerContext) {
-                this.schedulerContext.close();
-                this.schedulerContext = null;
-            }
+            this.closeSchedulerContext();
         },
-        handleError: function (err) {
-            if (this.schedulerContext) {
-                this.schedulerContext.close();
-                this.schedulerContext = null;
-                if (this.sink) {
-                    this.sink.end(err);
-                    this.sink = null;
-                }
-            }
+        closeSchedulerContext: closeSchedulerContext,
+        endSink: endSink,
+        error: function (err) {
+            this.closeSchedulerContext();
+            this.endSink(err);
         }
     };
     Asyncplify.prototype.last = function (options) {
@@ -1431,41 +1424,48 @@
     Asyncplify.prototype.timeout = function (options) {
         return new Asyncplify(Timeout, options, this);
     };
-    function Timeout(options, on, source) {
+    function Timeout(options, sink, source) {
         var self = this;
         var other = options instanceof Asyncplify ? options : options && options.other || Asyncplify.throw(new Error('Timeout'));
-        this.on = on;
-        this.scheduler = (options && options.scheduler || schedulers.timeout)();
+        this.schedulerContext = (options && options.scheduler || schedulers.timeout)();
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        on.source = this;
-        this.scheduler.schedule({
+        this.schedulerContext.schedule({
             action: function () {
-                self.source.setState(CLOSED);
+                self.closeSource();
                 other._subscribe(self);
             },
             delay: typeof options === 'number' ? options : options && options.delay || 0,
-            dueTime: options instanceof Date ? options : options && options.dueTime
+            dueTime: options instanceof Date ? options : options && options.dueTime,
+            error: function (err) {
+                self.error(err);
+            }
         });
         source._subscribe(this);
     }
     Timeout.prototype = {
-        closeScheduler: function () {
-            if (this.scheduler) {
-                this.scheduler.setState(CLOSED);
-                this.scheduler = null;
-            }
+        close: function () {
+            this.sink = null;
+            this.closeSource();
+            this.closeSchedulerContext();
         },
+        closeSource: closeSource,
+        closeSchedulerContext: closeSchedulerContext,
         emit: function (value) {
-            this.closeScheduler();
-            this.on.emit(value);
+            this.closeSchedulerContext();
+            this.sink.emit(value);
         },
         end: function (err) {
-            this.closeScheduler();
-            this.on.end(err);
+            this.source = null;
+            this.endSink(err);
+            this.closeSchedulerContext();
         },
-        setState: function (state) {
-            this.scheduler && this.scheduler.setState(state);
-            this.source.setState(state);
+        endSink: endSink,
+        error: function (err) {
+            this.closeSource();
+            this.endSink(err);
+            this.closeSchedulerContext();
         }
     };
     Asyncplify.prototype.toArray = function (options, source, cb) {
@@ -1576,6 +1576,20 @@
         end: noop,
         setState: setStateThru
     };
+    function closeSchedulerContext() {
+        var schedulerContext = this.schedulerContext;
+        if (schedulerContext) {
+            this.schedulerContext = null;
+            schedulerContext.close();
+        }
+    }
+    function closeSource() {
+        var source = this.source;
+        if (source) {
+            this.source = null;
+            source.close();
+        }
+    }
     function closeSink() {
         this.sink = null;
     }
@@ -1595,6 +1609,13 @@
     function emitThru(value) {
         if (this.sink)
             this.sink.emit(value);
+    }
+    function endSink(err) {
+        var sink = this.sink;
+        if (sink) {
+            this.sink = null;
+            sink.end(err);
+        }
     }
     function endThru() {
         throw new Error('Deprecated');

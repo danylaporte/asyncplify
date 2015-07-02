@@ -9,7 +9,7 @@ function Interval(options, sink) {
     this.item = {
         action: function () { self.action(); },
         delay: options && options.delay || typeof options === 'number' && options || 0,
-        error: function (err) { self.handleError(err); }
+        error: function (err) { self.error(err); }
     };
     this.schedulerContext = (options && options.scheduler || schedulers.timeout)();
     this.sink = sink;
@@ -29,21 +29,12 @@ Interval.prototype = {
     },
     close: function () {
         this.sink = null;
-        
-        if (this.schedulerContext) {
-            this.schedulerContext.close();
-            this.schedulerContext = null;
-        }
+        this.closeSchedulerContext();
     },
-    handleError: function (err) {
-        if (this.schedulerContext) {
-            this.schedulerContext.close();
-            this.schedulerContext = null;
-            
-            if (this.sink) {
-                this.sink.end(err);
-                this.sink = null;
-            }
-        }
+    closeSchedulerContext: closeSchedulerContext,
+    endSink: endSink,
+    error: function (err) {
+        this.closeSchedulerContext();
+        this.endSink(err);
     }
 };

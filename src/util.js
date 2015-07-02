@@ -1,3 +1,19 @@
+function closeSchedulerContext() {
+    var schedulerContext = this.schedulerContext;
+    if (schedulerContext) {
+        this.schedulerContext = null;
+        schedulerContext.close();
+    }    
+}
+
+function closeSource() {
+    var source = this.source;
+    if (source) {
+        this.source = null;
+        source.close();
+    }
+}
+
 function closeSink() {
     this.sink = null;
 }
@@ -22,6 +38,13 @@ function condFalse() {
 function emitThru(value) {
     if (this.sink)
         this.sink.emit(value);
+}
+function endSink(err) {
+    var sink = this.sink;
+    if (sink) {
+        this.sink = null;
+        sink.end(err);
+    }
 }
 
 function endThru() {
