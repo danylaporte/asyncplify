@@ -1,94 +1,89 @@
 Asyncplify.zip = function (options) {
-    return new Asyncplify(Zip, options)
-}
+    return new Asyncplify(Zip, options);
+};
 
-function Zip(options, on) {
+function Zip(options, sink) {
     var items = options.items || options || [];
 
     this.mapper = options && options.mapper || null;
-    this.on = on;
-    this.state = RUNNING;
+    this.sink = sink;
+    this.sink.source = this;
+    this.subscribables = items.length;
     this.subscriptions = [];
-    on.source = this;
 
-    var i;
-
-    for (i = 0; i < items.length; i++) {
-        this.subscriptions.push(new ZipItem(items[i], this));
+    for (var i = 0; i < items.length && this.sink; i++) {
+        this.subscribables--;
+        new ZipItem(items[i], this);
     }
-
-    for (i = 0; i < this.subscriptions.length; i++) {
-        this.subscriptions[i].setState(this.state);
-    }
-
-    !this.subscriptions.length && on.end(null);
+    
+    if (!items.length) this.sink.end(null);
 }
 
 Zip.prototype = {
-    setState: function (state) {
-        if (this.state !== state && this.state !== CLOSED) {
-            this.state = state;
+    close: function () {
+        this.sink = null;
+        this.closeSubscriptions();
+    },
+    closeSubscriptions: function () {
+        for (var i = 0; i < this.subscriptions.length; i++)
+            this.subscriptions[i].close();
 
-            for (var i = 0; i < this.subscriptions.length; i++) {
-                this.subscriptions[i].setState(this.state);
-            }
-        }
+        this.mapper = null;
+        this.subscriptions.length = 0;
     }
-}
+};
 
-function ZipItem(item, on) {
-    this.item = item;
+function ZipItem(source, parent) {
     this.items = [];
-    this.on = on;
+    this.parent = parent;
     this.source = null;
-    this.state = PAUSED;
+    
+    parent.subscriptions.push(this);
+    source._subscribe(this);
 }
 
 ZipItem.prototype = {
+    close: function () {
+        if (this.source) this.source.close();
+        this.source = null;
+    },
     emit: function (v) {
         this.items.push(v);
 
-        if (this.items.length === 1) {
+        if (this.items.length === 1 && !this.parent.subscribables && this.parent.sink) {
             var array = [];
-            var subscriptions = this.on.subscriptions;
-            var i;
+            var i, s;
+            var subscriptions = this.parent.subscriptions;
 
             for (i = 0; i < subscriptions.length; i++) {
-                if (!subscriptions[i].items.length) {
-                     return;
-                }
-            }
-
-            for (i = 0; i < subscriptions.length; i++) {
-                array.push(subscriptions[i].items.splice(0, 1)[0]);
+                s = subscriptions[i];
+                if (!s.items.length) return;
+                array.push(s.items.splice(0, 1)[0]);
             }
             
-            this.on.on.emit(this.on.mapper ? this.on.mapper.apply(null, array) : array);
+            this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
             
             for (i = 0; i < subscriptions.length; i++) {
-                var s = subscriptions[i];
+                s = subscriptions[i];
                 
-                if (s.state === CLOSED && !s.items.length) {
-                    this.on.setState(CLOSED);
-                    this.on.on.end(null);
+                if (!s.source && !s.items.length) {
+                    this.parent.closeSubscriptions();
+                    
+                    var sink = this.parent.sink;
+                    this.parent.sink = null;
+                    if (sink) sink.end(null);
                     break;
                 }
             }
         }
     },
     end: function (err) {
-        if (this.state === CLOSED) return;
-        this.state = CLOSED;
+        this.source = null;
         
-        if (err || !this.items.length) {
-            this.on.setState(CLOSED);
-            this.on.on.end(err);
-        }
-    },
-    setState: function (state) {
-        if (this.state !== state && this.state !== CLOSED) {
-            this.state = state;
-            this.source ? this.source.setState(state) : (state === RUNNING && this.item._subscribe(this));
+        if ((err || !this.items.length) && this.parent.sink) {
+            var sink = this.parent.sink;
+            this.parent.sink = null;
+            sink.end(err);
         }
     }
-}
+};

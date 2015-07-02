@@ -1438,40 +1438,56 @@
         this.delay = typeof options === 'number' ? options : options && options.delay || 0;
         this.dueTime = options instanceof Date ? options : options && options.dueTime;
         this.other = options instanceof Asyncplify ? options : options && options.other || Asyncplify.throw(new Error('Timeout'));
-        this.schedulerContext = (options && options.scheduler || schedulers.timeout)();
+        this.scheduler = (options && options.scheduler || schedulers.timeout)();
         this.sink = sink;
         this.sink.source = this;
         this.source = null;
-        this.schedulerContext.schedule(this);
-        source._subscribe(this);
+        this.subscribable = source;
+        this.scheduler.schedule(this);
+        if (this.subscribable) {
+            this.subscribable._subscribe(this);
+            this.subscribable = null;
+        }
     }
     Timeout.prototype = {
         action: function () {
-            this.closeSource();
-            this.closeSchedulerContext();
+            this.scheduler.close();
+            this.subscribable = this.scheduler = null;
+            if (this.source)
+                this.source.close();
             this.other._subscribe(this);
         },
         close: function () {
-            this.sink = null;
-            this.closeSource();
-            this.closeSchedulerContext();
+            if (this.source)
+                this.source.close();
+            if (this.scheduler)
+                this.scheduler.close();
+            this.sink = this.scheduler = this.source = null;
         },
-        closeSource: closeSource,
-        closeSchedulerContext: closeSchedulerContext,
         emit: function (value) {
-            this.closeSchedulerContext();
+            if (this.scheduler)
+                this.scheduler.close();
+            this.scheduler = null;
             this.sink.emit(value);
         },
         end: function (err) {
-            this.source = null;
-            this.closeSchedulerContext();
-            this.endSink(err);
+            if (this.scheduler)
+                this.scheduler.close();
+            this.source = this.scheduler = null;
+            var sink = this.sink;
+            this.sink = null;
+            if (sink)
+                sink.end(err);
         },
-        endSink: endSink,
         error: function (err) {
-            this.closeSource();
-            this.closeSchedulerContext();
-            this.endSink(err);
+            this.scheduler.close();
+            this.scheduler = null;
+            if (this.source)
+                this.source.close();
+            this.source = null;
+            if (this.sink)
+                this.sink.end(err);
+            this.sink = null;
         }
     };
     Asyncplify.prototype.toArray = function (options, source, cb) {
@@ -1688,78 +1704,77 @@
     Asyncplify.zip = function (options) {
         return new Asyncplify(Zip, options);
     };
-    function Zip(options, on) {
+    function Zip(options, sink) {
         var items = options.items || options || [];
         this.mapper = options && options.mapper || null;
-        this.on = on;
-        this.state = RUNNING;
+        this.sink = sink;
+        this.sink.source = this;
+        this.subscribables = items.length;
         this.subscriptions = [];
-        on.source = this;
-        var i;
-        for (i = 0; i < items.length; i++) {
-            this.subscriptions.push(new ZipItem(items[i], this));
+        for (var i = 0; i < items.length && this.sink; i++) {
+            this.subscribables--;
+            new ZipItem(items[i], this);
         }
-        for (i = 0; i < this.subscriptions.length; i++) {
-            this.subscriptions[i].setState(this.state);
-        }
-        !this.subscriptions.length && on.end(null);
+        if (!items.length)
+            this.sink.end(null);
     }
     Zip.prototype = {
-        setState: function (state) {
-            if (this.state !== state && this.state !== CLOSED) {
-                this.state = state;
-                for (var i = 0; i < this.subscriptions.length; i++) {
-                    this.subscriptions[i].setState(this.state);
-                }
-            }
+        close: function () {
+            this.sink = null;
+            this.closeSubscriptions();
+        },
+        closeSubscriptions: function () {
+            for (var i = 0; i < this.subscriptions.length; i++)
+                this.subscriptions[i].close();
+            this.mapper = null;
+            this.subscriptions.length = 0;
         }
     };
-    function ZipItem(item, on) {
-        this.item = item;
+    function ZipItem(source, parent) {
         this.items = [];
-        this.on = on;
+        this.parent = parent;
         this.source = null;
-        this.state = PAUSED;
+        parent.subscriptions.push(this);
+        source._subscribe(this);
     }
     ZipItem.prototype = {
+        close: function () {
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: function (v) {
             this.items.push(v);
-            if (this.items.length === 1) {
+            if (this.items.length === 1 && !this.parent.subscribables && this.parent.sink) {
                 var array = [];
-                var subscriptions = this.on.subscriptions;
-                var i;
+                var i, s;
+                var subscriptions = this.parent.subscriptions;
                 for (i = 0; i < subscriptions.length; i++) {
-                    if (!subscriptions[i].items.length) {
+                    s = subscriptions[i];
+                    if (!s.items.length)
                         return;
-                    }
+                    array.push(s.items.splice(0, 1)[0]);
                 }
+                this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
                 for (i = 0; i < subscriptions.length; i++) {
-                    array.push(subscriptions[i].items.splice(0, 1)[0]);
-                }
-                this.on.on.emit(this.on.mapper ? this.on.mapper.apply(null, array) : array);
-                for (i = 0; i < subscriptions.length; i++) {
-                    var s = subscriptions[i];
-                    if (s.state === CLOSED && !s.items.length) {
-                        this.on.setState(CLOSED);
-                        this.on.on.end(null);
+                    s = subscriptions[i];
+                    if (!s.source && !s.items.length) {
+                        this.parent.closeSubscriptions();
+                        var sink = this.parent.sink;
+                        this.parent.sink = null;
+                        if (sink)
+                            sink.end(null);
                         break;
                     }
                 }
             }
         },
         end: function (err) {
-            if (this.state === CLOSED)
-                return;
-            this.state = CLOSED;
-            if (err || !this.items.length) {
-                this.on.setState(CLOSED);
-                this.on.on.end(err);
-            }
-        },
-        setState: function (state) {
-            if (this.state !== state && this.state !== CLOSED) {
-                this.state = state;
-                this.source ? this.source.setState(state) : state === RUNNING && this.item._subscribe(this);
+            this.source = null;
+            if ((err || !this.items.length) && this.parent.sink) {
+                var sink = this.parent.sink;
+                this.parent.sink = null;
+                sink.end(err);
             }
         }
     };
