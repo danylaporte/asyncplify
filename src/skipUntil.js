@@ -1,41 +1,39 @@
 Asyncplify.prototype.skipUntil = function (trigger) {
-    return new Asyncplify(SkipUntil, trigger, this)
-}
+    return new Asyncplify(SkipUntil, trigger, this);
+};
 
-function SkipUntil(trigger, on, source) {
+function SkipUntil(trigger, sink, source) {
     this.can = false;
-    this.on = on;
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
     this.trigger = null;
 
-    on.source = this;
     new Trigger(trigger, this);
     source._subscribe(this);
 }
 
 SkipUntil.prototype = {
+    close: function () {
+        this.sink = NoopSink.instance;
+        if (this.trigger) this.trigger.close();
+        if (this.source) this.source.close();
+        this.trigger = this.source = null;  
+    },
     emit: function (value) {
-        this.can && this.on.emit(value);
+        if (this.can) this.sink.emit(value);
     },
     end: function (err) {
-        if (this.trigger) {
-            this.trigger.setState(CLOSED);
-            this.trigger = null;
-        }
-
-        this.on.end(err);
-    },
-    setState: function (state) {
-        this.trigger && this.trigger.setState(state);
-        this.source && this.source.setState(CLOSED);
-
-        if (state === CLOSED) {
-            this.trigger = null;
-        }
+        if (this.trigger) this.trigger.close();
+        this.trigger = this.source = null;
+        
+        var sink = this.sink;
+        this.sink = null;
+        sink.end(err);
     },
     triggerEmit: function () {
-        this.trigger && this.trigger.setState(CLOSED);
+        this.trigger.close();
         this.trigger = null;
         this.can = true;
     }
-}
+};

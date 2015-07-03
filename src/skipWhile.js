@@ -1,24 +1,35 @@
 Asyncplify.prototype.skipWhile = function (cond) {
     return new Asyncplify(SkipWhile, cond, this);
-}
+};
 
-function SkipWhile(cond, on, source) {
+function SkipWhile(cond, sink, source) {
     this.can = false;
     this.cond = cond;
-    this.on = on;
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
 
-    on.source = this;
     source._subscribe(this);
 }
 
 SkipWhile.prototype = {
+    close: function () {
+        this.cond = condTrue;
+        this.sink = NoopSink.instance;
+        if (this.source) this.source.close();
+        this.source = null;
+    },
     emit: function (value) {
         if (this.can || !this.cond(value)) {
             this.can = true;
-            this.on.emit(value);
+            this.sink.emit(value);
         }
     },
-    end: endThru,
-    setState: setStateThru
-}
+    end: function (err) {
+        this.cond = condTrue;
+        this.source = null;        
+        var sink = this.sink;
+        this.sink = NoopSink.instance;
+        sink.end(err);
+    }
+};

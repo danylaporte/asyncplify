@@ -1,22 +1,35 @@
 Asyncplify.prototype.skipLast = function (count) {
     return new Asyncplify(SkipLast, typeof count === 'number' ? count : 1, this);
-}
+};
 
-function SkipLast(count, on, source) {
+function SkipLast(count, sink, source) {
     this.count = count;
-    this.on = on;
-    this.source = null;
     this.items = [];
+    this.sink = sink;
+    this.sink.source = this;
+    this.source = null;
 
-    on.source = this;
     source._subscribe(this);
 }
 
 SkipLast.prototype = {
-    emit: function (value) {
-        this.items.push(value);
-        this.items.length > this.count && this.on.emit(this.items.splice(0, 1)[0]);
+    close: function () {
+        this.sink = NoopSink.instance;
+        if (this.source) this.source.close();
+        this.items.length = 0;
+        this.source = null;  
     },
-    end: endThru,
-    setState: setStateThru
-}
+    emit: function (value) {
+        this.source = null;
+        this.items.push(value);
+        this.items.length > this.count && this.sink.emit(this.items.splice(0, 1)[0]);
+    },
+    end: function (err) {
+        this.source = null;
+        this.items.length = 0;
+        
+        var sink = this.sink;
+        this.sink = NoopSink.instance;
+        sink.end(err);
+    }
+};
