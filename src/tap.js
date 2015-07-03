@@ -2,31 +2,30 @@ Asyncplify.prototype.tap = function (options) {
     return new Asyncplify(Tap, options, this);
 };
 
-function Tap(options, on, source) {
+function Tap(options, sink, source) {
     this._emit = options && options.emit || typeof options === 'function' && options || noop;
-    this.isSubscriberError = false;
-    this.on = on;
-    this.options = options;
+    this._end = options && options.end || noop;
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
-    on.source = this;
 
-    if (options && options.subscribe) options.subscribe({ on: on, source: source });
+    if (options && options.subscribe) options.subscribe({ sink: sink, source: source });
     source._subscribe(this);
 }
 
 Tap.prototype = {
+    close: function () {
+        this.sink = NoopSink.instance;
+        if (this.source) this.source.close();
+        this.source = null;
+    },
     emit: function (value) {
-        this.isSubscriberError = true;
         this._emit(value);
-        this.on.emit(value);
-        this.isSubscriberError = false;
+        this.sink.emit(value);
     },
     end: function (err) {
-        if (this.options && this.options.end) this.options.end(err, this.isSubscriberError);
-        this.on.end(err);
-    },
-    setState: function (state) {
-        if (this.options && this.options.setState) this.options.setState(state);
-        this.source.setState(state);
+        this.source = null;
+        this._end(err);
+        this.sink.end(err);
     }
 };

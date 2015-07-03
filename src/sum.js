@@ -1,26 +1,30 @@
 Asyncplify.prototype.sum = function (mapper, source, cb) {
-    return new Asyncplify(Sum, mapper || identity, this)
-}
+    return new Asyncplify(Sum, mapper || identity, this);
+};
 
-function Sum(mapper, on, source) {
+function Sum(mapper, sink, source) {
     this.hasValue = false;
     this.mapper = mapper;
-    this.value = 0;
-    this.on = on;
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
+    this.value = 0;
 
-    on.source = this;
     source._subscribe(this);
 }
 
 Sum.prototype = {
+    close: function () {
+        if (this.source) this.source.close();
+        this.source = this.sink = this.mapper = null;
+    },
     emit: function (value) {
         this.value += this.mapper(value) || 0;
         this.hasValue = true;
     },
     end: function (err) {
-        !err && this.hasValue && this.on.emit(this.value);
-        this.on.end(err);
-    },
-    setState: setStateThru
-}
+        this.source = null;
+        if (!err && this.hasValue && this.sink) this.sink.emit(this.value);
+        if (this.sink) this.sink.end(err);
+    }
+};

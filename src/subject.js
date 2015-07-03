@@ -5,55 +5,43 @@ Asyncplify.subject = function () {
     r.end = subjectEnd;
     r._src = r;
     return r;
-}
+};
 
 function subjectEmit(value) {
-    for (var i = 0; i < this.subjects.length; i++) {
+    for (var i = 0; i < this.subjects.length; i++)
         this.subjects[i].emit(value);
-    }
 }
 
 function subjectEnd(err) {
-    for (var i = 0; i < this.subjects.length; i++) {
-         this.subjects[i].end(err);
-    }
+    var subjects = this.subjects;
+    
+    this.subjects = [];
+    
+    for (var i = 0; i < subjects.length; i++)
+         subjects[i].end(err);
 }
 
-function Subject(_, on, source) {
-    this.on = on;
-    this.source = source;
-    this.state = RUNNING;
-    this.endCalled = false;
-    this.err = null;
+function Subject(_, sink, parent) {
+    this.parent = parent;
+    this.sink = sink;
+    this.sink.source = this;
 
-    on.source = this;
-    source.subjects.push(this);
+    parent.subjects.push(this);
 }
 
 Subject.prototype = {
-    do: function () {
-        if (this.endCalled) {
-            this.state = CLOSED;
-            this.on.end(this.err);
-        }
+    close: function () {
+        if (this.parent) removeItem(this.parent.subjects, this);
+        this.parent = null;
     },
     emit: function (value) {
-        this.state === RUNNING && this.on.emit(value);
+        this.sink.emit(value);
     },
     end: function (err) {
-        if (this.state === RUNNING) {
-            this.state = CLOSED;
-            this.on.end(err);
-        } else if (this.state === PAUSED) {
-            this.endCalled = true;
-            this.err = err;
-        }
-    },
-    setState: function (state) {
-        if (this.state !== CLOSED && this.state !== state) {
-            this.state = state;
-            state === CLOSED && removeItem(this.source.subjects, this);
-            state === RUNNING && this.do();
-        }
+        this.parent = null;
+        
+        var sink = this.sink;
+        this.sink = NoopSink.instance;
+        sink.end(err);
     }
-}
+};

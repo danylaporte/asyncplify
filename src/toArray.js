@@ -1,16 +1,17 @@
 Asyncplify.prototype.toArray = function (options, source, cb) {
-    return new Asyncplify(ToArray, options || {}, this);
+    return new Asyncplify(ToArray, options, this);
 };
 
-function ToArray(options, on, source) {
+function ToArray(options, sink, source) {
     this.array = [];
-    this.emitEmpty = options.emitEmpty || false;
-    this.on = on;
+    this.emitEmpty = options && options.emitEmpty || false;
+    this.hasEmit = false;
+    this.sink = sink;
+    this.sink.source = this;
     this.splitCond = null;
     this.splitLength = 0;
-    this.trigger = null;
-    this.hasEmit = false;
     this.source = null;
+    this.trigger = null;
 
     var split = options && options.split || options;
 
@@ -30,7 +31,6 @@ function ToArray(options, on, source) {
             break;
     }
 
-    on.source = this;
     source._subscribe(this);
 }
 
@@ -45,6 +45,11 @@ function toArraySplitLength(v) {
 }
 
 ToArray.prototype = {
+    close: function () {
+        this.sink = NoopSink.instance;
+        if (this.source) this.source.close();
+        this.source = null;
+    },
     emit: function (value) {
         this.array.push(value);
     },
@@ -52,23 +57,22 @@ ToArray.prototype = {
         var a = this.array;
         this.array = [];
         this.hasEmit = true;
-        this.on.emit(a);
+        this.sink.emit(a);
     },
     end: function (err) {
-        !err && (this.array.length || (!this.hasEmit && this.emitEmpty)) && this.on.emit(this.array);
+        this.source = null;
+        
+        if (!err && (this.array.length || (!this.hasEmit && this.emitEmpty)))
+            this.sink.emit(this.array);
 
-        if (this.trigger) {
-            this.trigger.setState(CLOSED);
-            this.trigger = null;
-        }
-
-        this.on.end(err);
-    },
-    setState: function (state) {
-        this.source.setState(state);
-        this.trigger && this.trigger.setState(state);
+        if (this.trigger) this.trigger.close();
+        this.trigger = null;
+        
+        var sink = this.sink;
+        this.sink = NoopSink.instance;
+        sink.end(err);
     },
     triggerEmit: function () {
-        (this.array.length || this.emitEmpty) && this.emitArray();
+        if (this.array.length || this.emitEmpty) this.emitArray();
     }
 };

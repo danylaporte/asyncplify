@@ -1,3 +1,14 @@
+function NoopSink() { }
+
+NoopSink.prototype = {
+    close: noop,
+    emit: noop,
+    end: noop
+};
+
+NoopSink.instance = new NoopSink();
+
+
 function closeSchedulerContext() {
     var schedulerContext = this.schedulerContext;
     if (schedulerContext) {

@@ -1,37 +1,40 @@
 Asyncplify.prototype.takeUntil = function (trigger) {
-    return new Asyncplify(TakeUntil, trigger, this)
-}
+    return new Asyncplify(TakeUntil, trigger, this);
+};
 
-function TakeUntil(trigger, on, source) {
-    this.on = on;
+function TakeUntil(trigger, sink, source) {
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
     this.trigger = null;
-    on.source = this;
 
     new Trigger(trigger, this);
-    this.trigger && source._subscribe(this);
+    
+    if (this.trigger) source._subscribe(this);
 }
 
 TakeUntil.prototype = {
-    emit: emitThru,
-    end: function (err) {
-        if (this.trigger) {
-            this.trigger.setState(CLOSED);
-            this.trigger = null;
-        }
-
-        this.on.end(err);
+    close: function () {
+        this.sink = NoopSink.instance;
+        if (this.source) this.source.close();
+        if (this.trigger) this.trigger.close();
+        this.source = this.trigger = null;  
     },
-    setState: function (state) {
-        this.trigger && this.trigger.setState(state);
-        this.source && this.source.setState(CLOSED);
-
-        if (state === CLOSED) {
-            this.trigger = null;
-        }
+    emit: function (value) {
+        this.sink.emit(value);
+    },
+    end: function (err) {
+        if (this.trigger) this.trigger.close();
+        this.source = this.trigger = null;
+        this.sink.end(err);
     },
     triggerEmit: function () {
-        this.setState(CLOSED);
-        this.on.end(null);
+        if (this.source) this.source.close();
+        this.trigger.close();
+        this.source = this.trigger = null;
+        
+        var sink = this.sink;
+        this.sink = NoopSink.instance;
+        sink.end(null);
     }
-}
+};

@@ -6,30 +6,35 @@ function SubscribeOn(options, sink, source) {
     this.origin = source;
     this.sink = sink;
     this.sink.source = this;
-    this.schedulerContext = (typeof options === 'function' ? options : (options && options.scheduler || schedulers.immediate))();
+    this.scheduler = (typeof options === 'function' ? options : (options && options.scheduler || schedulers.immediate))();
     this.source = null;
 
-    this.schedulerContext.schedule(this);
+    this.scheduler.schedule(this);
 }
 
 SubscribeOn.prototype = {
     action: function () {
-        this.closeSchedulerContext();
+        this.scheduler.close();
+        this.scheduler = null;
         this.origin._subscribe(this);
+        this.origin = null;
     },
     close: function () {
-        this.closeSchedulerContext();
-        this.closeSource();
-        this.sink = null;
+        if (this.scheduler) this.scheduler.close();
+        if (this.source) this.source.close();
+        this.scheduler = this.source = this.origin = null;
     },
-    closeSchedulerContext: closeSchedulerContext,
-    closeSource: closeSource,
-    emit: emitThru,
-    end: endSinkSource,
-    endSink: endSink,
+    emit: function (value) {
+        this.sink.emit(value);  
+    },
+    end: function (err) {
+        this.source = null;
+        this.sink.end(err);  
+    },
     error: function (err) {
-        this.closeSchedulerContext();
-        this.closeSource();
-        this.endSink(err);
+        this.scheduler.close();
+        this.source.close();
+        this.scheduler = this.source = this.origin = null;
+        this.sink.end(err);
     }
 };

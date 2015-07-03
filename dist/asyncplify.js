@@ -1184,49 +1184,35 @@
         return r;
     };
     function subjectEmit(value) {
-        for (var i = 0; i < this.subjects.length; i++) {
+        for (var i = 0; i < this.subjects.length; i++)
             this.subjects[i].emit(value);
-        }
     }
     function subjectEnd(err) {
-        for (var i = 0; i < this.subjects.length; i++) {
-            this.subjects[i].end(err);
-        }
+        var subjects = this.subjects;
+        this.subjects = [];
+        for (var i = 0; i < subjects.length; i++)
+            subjects[i].end(err);
     }
-    function Subject(_, on, source) {
-        this.on = on;
-        this.source = source;
-        this.state = RUNNING;
-        this.endCalled = false;
-        this.err = null;
-        on.source = this;
-        source.subjects.push(this);
+    function Subject(_, sink, parent) {
+        this.parent = parent;
+        this.sink = sink;
+        this.sink.source = this;
+        parent.subjects.push(this);
     }
     Subject.prototype = {
-        do: function () {
-            if (this.endCalled) {
-                this.state = CLOSED;
-                this.on.end(this.err);
-            }
+        close: function () {
+            if (this.parent)
+                removeItem(this.parent.subjects, this);
+            this.parent = null;
         },
         emit: function (value) {
-            this.state === RUNNING && this.on.emit(value);
+            this.sink.emit(value);
         },
         end: function (err) {
-            if (this.state === RUNNING) {
-                this.state = CLOSED;
-                this.on.end(err);
-            } else if (this.state === PAUSED) {
-                this.endCalled = true;
-                this.err = err;
-            }
-        },
-        setState: function (state) {
-            if (this.state !== CLOSED && this.state !== state) {
-                this.state = state;
-                state === CLOSED && removeItem(this.source.subjects, this);
-                state === RUNNING && this.do();
-            }
+            this.parent = null;
+            var sink = this.sink;
+            this.sink = NoopSink.instance;
+            sink.end(err);
         }
     };
     Asyncplify.prototype.subscribe = function (options) {
@@ -1259,53 +1245,67 @@
         this.origin = source;
         this.sink = sink;
         this.sink.source = this;
-        this.schedulerContext = (typeof options === 'function' ? options : options && options.scheduler || schedulers.immediate)();
+        this.scheduler = (typeof options === 'function' ? options : options && options.scheduler || schedulers.immediate)();
         this.source = null;
-        this.schedulerContext.schedule(this);
+        this.scheduler.schedule(this);
     }
     SubscribeOn.prototype = {
         action: function () {
-            this.closeSchedulerContext();
+            this.scheduler.close();
+            this.scheduler = null;
             this.origin._subscribe(this);
+            this.origin = null;
         },
         close: function () {
-            this.closeSchedulerContext();
-            this.closeSource();
-            this.sink = null;
+            if (this.scheduler)
+                this.scheduler.close();
+            if (this.source)
+                this.source.close();
+            this.scheduler = this.source = this.origin = null;
         },
-        closeSchedulerContext: closeSchedulerContext,
-        closeSource: closeSource,
-        emit: emitThru,
-        end: endSinkSource,
-        endSink: endSink,
+        emit: function (value) {
+            this.sink.emit(value);
+        },
+        end: function (err) {
+            this.source = null;
+            this.sink.end(err);
+        },
         error: function (err) {
-            this.closeSchedulerContext();
-            this.closeSource();
-            this.endSink(err);
+            this.scheduler.close();
+            this.source.close();
+            this.scheduler = this.source = this.origin = null;
+            this.sink.end(err);
         }
     };
     Asyncplify.prototype.sum = function (mapper, source, cb) {
         return new Asyncplify(Sum, mapper || identity, this);
     };
-    function Sum(mapper, on, source) {
+    function Sum(mapper, sink, source) {
         this.hasValue = false;
         this.mapper = mapper;
-        this.value = 0;
-        this.on = on;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        on.source = this;
+        this.value = 0;
         source._subscribe(this);
     }
     Sum.prototype = {
+        close: function () {
+            if (this.source)
+                this.source.close();
+            this.source = this.sink = this.mapper = null;
+        },
         emit: function (value) {
             this.value += this.mapper(value) || 0;
             this.hasValue = true;
         },
         end: function (err) {
-            !err && this.hasValue && this.on.emit(this.value);
-            this.on.end(err);
-        },
-        setState: setStateThru
+            this.source = null;
+            if (!err && this.hasValue && this.sink)
+                this.sink.emit(this.value);
+            if (this.sink)
+                this.sink.end(err);
+        }
     };
     Asyncplify.prototype.take = function (count) {
         return new Asyncplify(count ? Take : Empty, count, this);
@@ -1339,33 +1339,41 @@
     Asyncplify.prototype.takeUntil = function (trigger) {
         return new Asyncplify(TakeUntil, trigger, this);
     };
-    function TakeUntil(trigger, on, source) {
-        this.on = on;
+    function TakeUntil(trigger, sink, source) {
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
         this.trigger = null;
-        on.source = this;
         new Trigger(trigger, this);
-        this.trigger && source._subscribe(this);
+        if (this.trigger)
+            source._subscribe(this);
     }
     TakeUntil.prototype = {
-        emit: emitThru,
-        end: function (err) {
-            if (this.trigger) {
-                this.trigger.setState(CLOSED);
-                this.trigger = null;
-            }
-            this.on.end(err);
+        close: function () {
+            this.sink = NoopSink.instance;
+            if (this.source)
+                this.source.close();
+            if (this.trigger)
+                this.trigger.close();
+            this.source = this.trigger = null;
         },
-        setState: function (state) {
-            this.trigger && this.trigger.setState(state);
-            this.source && this.source.setState(CLOSED);
-            if (state === CLOSED) {
-                this.trigger = null;
-            }
+        emit: function (value) {
+            this.sink.emit(value);
+        },
+        end: function (err) {
+            if (this.trigger)
+                this.trigger.close();
+            this.source = this.trigger = null;
+            this.sink.end(err);
         },
         triggerEmit: function () {
-            this.setState(CLOSED);
-            this.on.end(null);
+            if (this.source)
+                this.source.close();
+            this.trigger.close();
+            this.source = this.trigger = null;
+            var sink = this.sink;
+            this.sink = NoopSink.instance;
+            sink.end(null);
         }
     };
     Asyncplify.prototype.takeWhile = function (cond) {
@@ -1400,36 +1408,34 @@
     Asyncplify.prototype.tap = function (options) {
         return new Asyncplify(Tap, options, this);
     };
-    function Tap(options, on, source) {
+    function Tap(options, sink, source) {
         this._emit = options && options.emit || typeof options === 'function' && options || noop;
-        this.isSubscriberError = false;
-        this.on = on;
-        this.options = options;
+        this._end = options && options.end || noop;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        on.source = this;
         if (options && options.subscribe)
             options.subscribe({
-                on: on,
+                sink: sink,
                 source: source
             });
         source._subscribe(this);
     }
     Tap.prototype = {
+        close: function () {
+            this.sink = NoopSink.instance;
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: function (value) {
-            this.isSubscriberError = true;
             this._emit(value);
-            this.on.emit(value);
-            this.isSubscriberError = false;
+            this.sink.emit(value);
         },
         end: function (err) {
-            if (this.options && this.options.end)
-                this.options.end(err, this.isSubscriberError);
-            this.on.end(err);
-        },
-        setState: function (state) {
-            if (this.options && this.options.setState)
-                this.options.setState(state);
-            this.source.setState(state);
+            this.source = null;
+            this._end(err);
+            this.sink.end(err);
         }
     };
     Asyncplify.throw = function (err, cb) {
@@ -1499,17 +1505,18 @@
         }
     };
     Asyncplify.prototype.toArray = function (options, source, cb) {
-        return new Asyncplify(ToArray, options || {}, this);
+        return new Asyncplify(ToArray, options, this);
     };
-    function ToArray(options, on, source) {
+    function ToArray(options, sink, source) {
         this.array = [];
-        this.emitEmpty = options.emitEmpty || false;
-        this.on = on;
+        this.emitEmpty = options && options.emitEmpty || false;
+        this.hasEmit = false;
+        this.sink = sink;
+        this.sink.source = this;
         this.splitCond = null;
         this.splitLength = 0;
-        this.trigger = null;
-        this.hasEmit = false;
         this.source = null;
+        this.trigger = null;
         var split = options && options.split || options;
         switch (typeof split) {
         case 'number':
@@ -1525,7 +1532,6 @@
                 new Trigger(split, this);
             break;
         }
-        on.source = this;
         source._subscribe(this);
     }
     function toArraySplitCond(v) {
@@ -1537,6 +1543,12 @@
         this.splitLength && this.array.length >= this.splitLength && this.emitArray();
     }
     ToArray.prototype = {
+        close: function () {
+            this.sink = NoopSink.instance;
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: function (value) {
             this.array.push(value);
         },
@@ -1544,22 +1556,22 @@
             var a = this.array;
             this.array = [];
             this.hasEmit = true;
-            this.on.emit(a);
+            this.sink.emit(a);
         },
         end: function (err) {
-            !err && (this.array.length || !this.hasEmit && this.emitEmpty) && this.on.emit(this.array);
-            if (this.trigger) {
-                this.trigger.setState(CLOSED);
-                this.trigger = null;
-            }
-            this.on.end(err);
-        },
-        setState: function (state) {
-            this.source.setState(state);
-            this.trigger && this.trigger.setState(state);
+            this.source = null;
+            if (!err && (this.array.length || !this.hasEmit && this.emitEmpty))
+                this.sink.emit(this.array);
+            if (this.trigger)
+                this.trigger.close();
+            this.trigger = null;
+            var sink = this.sink;
+            this.sink = NoopSink.instance;
+            sink.end(err);
         },
         triggerEmit: function () {
-            (this.array.length || this.emitEmpty) && this.emitArray();
+            if (this.array.length || this.emitEmpty)
+                this.emitArray();
         }
     };
     Asyncplify.prototype.transduce = function (transformer, source, cb) {
@@ -1618,6 +1630,14 @@
         },
         end: noop
     };
+    function NoopSink() {
+    }
+    NoopSink.prototype = {
+        close: noop,
+        emit: noop,
+        end: noop
+    };
+    NoopSink.instance = new NoopSink();
     function closeSchedulerContext() {
         var schedulerContext = this.schedulerContext;
         if (schedulerContext) {
