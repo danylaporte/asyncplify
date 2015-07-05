@@ -34,19 +34,25 @@
         source._subscribe(this);
     }
     Catch.prototype = {
-        close: closeSinkSource,
-        emit: emitThru,
+        close: function () {
+            this.mapper = noop;
+            this.sink = NoopSink.instance;
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
+        emit: function (value) {
+            this.sink.emit(value);
+        },
         end: function (err) {
             this.source = null;
-            if (err && this.sink) {
+            if (err) {
                 var source = this.mapper(err);
                 if (source && this.sink)
                     return source._subscribe(this);
             }
-            if (this.sink) {
-                this.sink.end(err);
-                this.sink = null;
-            }
+            this.sink.end(err);
+            this.sink = NoopSink.instance;
         },
         mapper: function () {
             return this.i < this.sources.length && this.sources[this.i++];
@@ -73,11 +79,10 @@
             this.sink.end(null);
     }
     CombineLatest.prototype.close = function () {
-        if (this.sink) {
-            this.sink = null;
-            for (var i = 0; i < this.subscriptions.length; i++)
-                this.subscriptions[i].close();
-        }
+        this.sink = NoopSink.instance;
+        for (var i = 0; i < this.subscriptions.length; i++)
+            this.subscriptions[i].close();
+        this.subscriptions.length = 0;
     };
     function CombineLatestItem(source, parent, index) {
         this.hasValue = false;
@@ -88,33 +93,28 @@
     }
     CombineLatestItem.prototype = {
         close: function () {
-            this.parent = null;
             if (this.source)
                 this.source.close();
             this.source = null;
         },
         emit: function (v) {
-            if (this.parent && this.parent.sink) {
-                this.parent.values[this.index] = v;
-                if (!this.hasValue) {
-                    this.hasValue = true;
-                    this.parent.missingValuesCount--;
-                }
-                if (this.parent.missingValuesCount <= 0) {
-                    var array = this.parent.values.slice();
-                    this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
-                }
+            this.parent.values[this.index] = v;
+            if (!this.hasValue) {
+                this.hasValue = true;
+                this.parent.missingValuesCount--;
+            }
+            if (this.parent.missingValuesCount <= 0) {
+                var array = this.parent.values.slice();
+                this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
             }
         },
         end: function (err) {
-            if (this.source) {
-                this.source = null;
-                this.parent.closableCount--;
-                if (err || !this.parent.closableCount) {
-                    this.parent.sink.end(err);
-                    if (err)
-                        this.parent.close();
-                }
+            this.source = null;
+            this.parent.closableCount--;
+            if (err || !this.parent.closableCount) {
+                this.parent.sink.end(err);
+                if (err)
+                    this.parent.close();
             }
         }
     };
@@ -130,18 +130,22 @@
         source._subscribe(this);
     }
     Count.prototype = {
-        close: closeSinkSource,
+        close: function () {
+            this.sink = NoopSink.instance;
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: function (value) {
-            if (this.sink && this.cond(value))
+            if (this.cond(value))
                 this.value++;
         },
         end: function (err) {
             this.source = null;
-            if (this.sink && !err)
+            if (!err)
                 this.sink.emit(this.value);
-            if (this.sink)
-                this.sink.end(err);
-            this.sink = null;
+            this.sink.end(err);
+            this.sink = NoopSink.instance;
         }
     };
     Asyncplify.prototype.debounce = function (options) {
@@ -223,7 +227,7 @@
     }
     DefaultIfEmpty.prototype = {
         close: function () {
-            this.sink = null;
+            this.sink = NoopSink.instance;
             if (this.source)
                 this.source.close();
             this.source = null;
@@ -235,11 +239,10 @@
         },
         end: function (err) {
             this.source = null;
-            if (!this.hasValue && !err && this.sink)
+            if (!this.hasValue && !err)
                 this.sink.emit(this.value);
-            if (this.sink)
-                this.sink.end(err);
-            this.sink = null;
+            this.sink.end(err);
+            this.sink = NoopSink.instance;
         }
     };
     Asyncplify.empty = function () {
@@ -664,9 +667,18 @@
         source._subscribe(this);
     }
     IgnoreElements.prototype = {
-        close: closeSinkSource,
+        close: function () {
+            this.sink = NoopSink.instance;
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: noop,
-        end: endSinkSource
+        end: function (err) {
+            this.source = null;
+            this.sink.end(err);
+            this.sink = NoopSink.instance;
+        }
     };
     Asyncplify.infinite = function () {
         return new Asyncplify(Infinite);
@@ -1742,10 +1754,11 @@
         this.sink = sink;
         this.sink.source = this;
         this.sink.emit(value);
-        if (this.sink)
-            this.sink.end(null);
+        this.sink.end(null);
     }
-    Value.prototype.close = closeSink;
+    Value.prototype.close = function () {
+        this.sink = NoopSink.instance;
+    };
     Asyncplify.zip = function (options) {
         return new Asyncplify(Zip, options);
     };

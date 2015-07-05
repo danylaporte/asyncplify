@@ -13,20 +13,18 @@ function Count(cond, sink, source) {
 }
 
 Count.prototype = {
-    close: closeSinkSource,
+    close: function () {
+        this.sink = NoopSink.instance;
+        if (this.source) this.source.close();
+        this.source = null;
+    },
     emit: function (value) {
-        if (this.sink && this.cond(value))
-            this.value++;
+        if (this.cond(value)) this.value++;
     },
     end: function (err) {
         this.source = null;
-
-        if (this.sink && !err)
-            this.sink.emit(this.value);
-
-        if (this.sink)
-            this.sink.end(err);
-
-        this.sink = null;
+        if (!err) this.sink.emit(this.value);
+        this.sink.end(err);
+        this.sink = NoopSink.instance;
     }
 };

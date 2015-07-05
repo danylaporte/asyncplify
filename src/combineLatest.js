@@ -26,12 +26,10 @@ function CombineLatest(options, sink) {
 }
 
 CombineLatest.prototype.close = function () {
-    if (this.sink) {
-        this.sink = null;
-
-        for (var i = 0; i < this.subscriptions.length; i++)
-            this.subscriptions[i].close();
-    }
+    this.sink = NoopSink.instance;
+    for (var i = 0; i < this.subscriptions.length; i++)
+        this.subscriptions[i].close();
+    this.subscriptions.length = 0;
 };
 
 function CombineLatestItem(source, parent, index) {
@@ -45,37 +43,29 @@ function CombineLatestItem(source, parent, index) {
 
 CombineLatestItem.prototype = {
     close: function () {
-        this.parent = null;
-        
-        if (this.source)
-            this.source.close();
-            
+        if (this.source) this.source.close();
         this.source = null;
     },
-    emit: function (v) { 
-        if (this.parent && this.parent.sink) {
-            this.parent.values[this.index] = v;
-
-            if (!this.hasValue) {
-                this.hasValue = true;
-                this.parent.missingValuesCount--;
-            }
+    emit: function (v) {
+        this.parent.values[this.index] = v;
+        
+        if (!this.hasValue) {
+            this.hasValue = true;
+            this.parent.missingValuesCount--;
+        }
     
-            if (this.parent.missingValuesCount <= 0) {
-                var array = this.parent.values.slice();
-                this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
-            }
+        if (this.parent.missingValuesCount <= 0) {
+            var array = this.parent.values.slice();
+            this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
         }
     },
     end: function (err) {
-        if (this.source) {
-            this.source = null;
-            this.parent.closableCount--;
+        this.source = null;
+        this.parent.closableCount--;
             
-            if (err || !this.parent.closableCount) {
-                this.parent.sink.end(err);
-                if (err) this.parent.close();
-            }
+        if (err || !this.parent.closableCount) {
+            this.parent.sink.end(err);
+            if (err) this.parent.close();
         }
     }
 };

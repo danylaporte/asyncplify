@@ -11,7 +11,15 @@ function IgnoreElements(_, sink, source) {
 }
 
 IgnoreElements.prototype = {
-    close: closeSinkSource,
+    close: function () {
+        this.sink = NoopSink.instance;
+        if (this.source) this.source.close();
+        this.source = null;
+    },
     emit: noop,
-    end: endSinkSource
+    end: function (err) {
+        this.source = null;
+        this.sink.end(err);
+        this.sink = NoopSink.instance;
+    }
 };
