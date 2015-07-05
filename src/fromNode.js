@@ -16,29 +16,22 @@ function FromNode(options, sink) {
     var self = this;
     
     function callback(err, value) {
-        if (!self.called) {
-            self.called = true;
-            
-            if (self.sink && !err)
-                self.sink.emit(value);
-                
-            if (self.sink)
-                self.sink.end(err);
-                
-            self.sink = null;
-        }
+        
+        if (self.called) return;
+        self.called = true;
+        
+        if (!err) self.sink.emit(value);
+        self.sink.end(err);
     }
     
     try {
         options[0].apply(null, options[1].concat([callback]));
     } catch (ex) {
         this.called = true;
-        
-        if (this.sink)
-            this.sink.end(ex);
-        
-        this.sink = null;
+        this.sink.end(ex);
     }
 }
 
-FromNode.prototype.close = closeSink;
+FromNode.prototype.close = function () {
+    this.sink = NoopSink.instance;
+};

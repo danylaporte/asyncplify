@@ -544,25 +544,23 @@
         this.sink.source = this;
         var self = this;
         function callback(err, value) {
-            if (!self.called) {
-                self.called = true;
-                if (self.sink && !err)
-                    self.sink.emit(value);
-                if (self.sink)
-                    self.sink.end(err);
-                self.sink = null;
-            }
+            if (self.called)
+                return;
+            self.called = true;
+            if (!err)
+                self.sink.emit(value);
+            self.sink.end(err);
         }
         try {
             options[0].apply(null, options[1].concat([callback]));
         } catch (ex) {
             this.called = true;
-            if (this.sink)
-                this.sink.end(ex);
-            this.sink = null;
+            this.sink.end(ex);
         }
     }
-    FromNode.prototype.close = closeSink;
+    FromNode.prototype.close = function () {
+        this.sink = NoopSink.instance;
+    };
     Asyncplify.fromPromise = function (promise, cb) {
         return new Asyncplify(FromPromise, promise);
     };
@@ -795,57 +793,54 @@
     Asyncplify.merge = function (options) {
         return new Asyncplify(Merge, options);
     };
-    function Merge(options, on) {
-        var items = options.items || options;
-        var maxConcurrency = options.maxConcurrency || 0;
-        this.on = on;
+    function Merge(options, sink) {
+        this.concurrency = 0;
+        this.index = 0;
+        this.items = options.items || options || [];
+        this.maxConcurrency = options.maxConcurrency || 0;
+        this.sink = sink;
+        this.sink.source = this;
         this.subscriptions = [];
-        on.source = this;
-        if (!Array.isArray(items)) {
-            throw Error('items are not an array');
-        }
-        this.iterator = new ArrayIterator(items);
-        var next;
-        var i = 0;
-        var found = false;
-        while ((i++ < maxConcurrency || maxConcurrency === 0) && !(next = this.iterator.next()).done) {
-            found = true;
-            new MergeItem(next.value, this);
-        }
-        !found && on.end(null);
+        while (this.index < this.items.length && (this.maxConcurrency < 1 || this.concurrency < this.maxConcurrency))
+            new MergeItem(this.items[this.index++], this);
+        if (!this.items.length)
+            this.sink.end(null);
     }
-    Merge.prototype = {
-        setState: function (state) {
-            for (var i = 0; i < this.subscriptions.length; i++) {
-                this.subscriptions[i].setState(state);
-            }
-        }
+    Merge.prototype.close = function () {
+        for (var i = 0; i < this.subscriptions.length; i++)
+            this.subscriptions[i].close();
+        this.subscriptions.length = 0;
     };
-    function MergeItem(item, on) {
-        this.on = on;
+    function MergeItem(item, parent) {
+        this.parent = parent;
         this.source = null;
-        on.subscriptions.push(this);
+        parent.concurrency++;
+        parent.subscriptions.push(this);
         item._subscribe(this);
     }
     MergeItem.prototype = {
+        close: function () {
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: function (v) {
-            this.on.on.emit(v);
+            this.parent.sink.emit(v);
         },
         end: function (err) {
-            removeItem(this.on.subscriptions, this);
-            if (err) {
-                this.on.setState(CLOSED);
-                this.on.on.end(err);
-            } else {
-                var next = this.on.iterator.next();
-                if (next.done) {
-                    this.on.on.end(null);
-                } else {
-                    new MergeItem(next.value, this.on);
+            if (this.source) {
+                this.source = null;
+                this.parent.concurrency--;
+                removeItem(this.parent.subscriptions, this);
+                if (err || this.parent.index >= this.parent.items.length) {
+                    var sink = this.parent.sink;
+                    this.parent.close();
+                    sink.end(err);
+                } else if (this.parent.maxConcurrency < 1 || this.parent.concurrency < this.parent.maxConcurrency) {
+                    new MergeItem(this.parent.items[this.parent.index++], this.parent);
                 }
             }
-        },
-        setState: setStateThru
+        }
     };
     Asyncplify.never = function () {
         return new Asyncplify(Never);
@@ -913,7 +908,9 @@
         if (this.sink)
             this.sink.end(null);
     }
-    RangeOp.prototype.close = closeSink;
+    RangeOp.prototype.close = function () {
+        this.sink = null;
+    };
     /*Flow.prototype.recurse = function (options) {
     var produce = options.produce;
     var feedback = options.feedback;

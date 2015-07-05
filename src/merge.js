@@ -1,68 +1,59 @@
 Asyncplify.merge = function (options) {
-    return new Asyncplify(Merge, options)
-}
+    return new Asyncplify(Merge, options);
+};
 
-function Merge(options, on) {
-    var items = options.items || options;
-    var maxConcurrency = options.maxConcurrency || 0;
-
-    this.on = on;
+function Merge(options, sink) {
+    this.concurrency = 0;
+    this.index = 0;
+    this.items = options.items || options || [];
+    this.maxConcurrency = options.maxConcurrency || 0;
+    this.sink = sink;
+    this.sink.source = this;
     this.subscriptions = [];
-    on.source = this;
 
-    if (!Array.isArray(items)) {
-        throw Error('items are not an array');
-    }
+    while (this.index < this.items.length && (this.maxConcurrency < 1 || this.concurrency < this.maxConcurrency))
+        new MergeItem(this.items[this.index++], this);
 
-    this.iterator = new ArrayIterator(items);
-
-    var next;
-    var i = 0;
-    var found = false;
-
-    while ((i++ < maxConcurrency || maxConcurrency === 0) && !(next = this.iterator.next()).done) {
-        found = true;
-        new MergeItem(next.value, this);
-    }
-
-    !found && on.end(null);
+    if (!this.items.length) this.sink.end(null);
 }
 
-Merge.prototype = {
-    setState: function (state) {
-        for (var i = 0; i < this.subscriptions.length; i++) {
-            this.subscriptions[i].setState(state);
-        }
-    }
-}
+Merge.prototype.close = function () {
+    for (var i = 0; i < this.subscriptions.length; i++)
+        this.subscriptions[i].close();
 
-function MergeItem(item, on) {
-    this.on = on;
+    this.subscriptions.length = 0;
+};
+
+function MergeItem(item, parent) {
+    this.parent = parent;
     this.source = null;
 
-    on.subscriptions.push(this);
+    parent.concurrency++;
+    parent.subscriptions.push(this);
     item._subscribe(this);
 }
 
 MergeItem.prototype = {
+    close: function () {
+        if (this.source) this.source.close();
+        this.source = null;
+    },
     emit: function (v) {
-        this.on.on.emit(v);
+        this.parent.sink.emit(v);
     },
     end: function (err) {
-        removeItem(this.on.subscriptions, this);
+        if (this.source) {
+            this.source = null;
+            this.parent.concurrency--;
+            removeItem(this.parent.subscriptions, this);
 
-        if (err) {
-            this.on.setState(CLOSED);
-            this.on.on.end(err);
-        } else {
-            var next = this.on.iterator.next();
-
-            if (next.done) {
-                this.on.on.end(null);
-            } else {
-                new MergeItem(next.value, this.on);
+            if (err || this.parent.index >= this.parent.items.length) {
+                var sink = this.parent.sink;
+                this.parent.close();
+                sink.end(err);
+            } else if (this.parent.maxConcurrency < 1 || this.parent.concurrency < this.parent.maxConcurrency) {
+                new MergeItem(this.parent.items[this.parent.index++], this.parent);
             }
         }
-    },
-    setState: setStateThru
-}
+    }
+};
