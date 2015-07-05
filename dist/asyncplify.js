@@ -719,56 +719,36 @@
             this.endSink(err);
         }
     };
-    Asyncplify.prototype.last = function (options) {
-        return new Asyncplify(Last, options, this);
+    Asyncplify.prototype.last = function (cond) {
+        return new Asyncplify(Last, cond, this);
     };
-    function Last(options, on, source) {
-        this.count = 1;
-        this.cond = condTrue;
-        this.items = [];
-        this.on = on;
+    function Last(cond, sink, source) {
+        this.cond = cond || condTrue;
+        this.hasItem = false;
+        this.item = null;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        this.state = RUNNING;
-        setCountAndCond(this, options);
-        if (!this.count) {
-            this.state = CLOSED;
-            on.end(null);
-        } else {
-            on.source = this;
-            source._subscribe(this);
-        }
+        source._subscribe(this);
     }
     Last.prototype = {
-        do: function () {
-            while (this.items.length && this.state === RUNNING) {
-                this.on.emit(this.items.pop());
-            }
-            if (this.state === RUNNING) {
-                this.state = CLOSED;
-                this.on.end(null);
-            }
+        close: function () {
+            if (this.source)
+                this.source.close();
+            this.sink = NoopSink.instance;
+            this.source = null;
         },
         emit: function (value) {
             if (this.cond(value)) {
-                this.items.unshift(value);
-                this.count > 0 && this.items.length > this.count && this.items.pop();
+                this.item = value;
+                this.hasItem = true;
             }
         },
         end: function (err) {
             this.source = null;
-            if (err) {
-                this.state = CLOSED;
-                this.end(err);
-            } else {
-                this.do();
-            }
-        },
-        setState: function (state) {
-            if (this.state !== state && this.state != CLOSED) {
-                this.state = state;
-                this.source && this.source.setState(state);
-                this.state === RUNNING && !this.source && this.do();
-            }
+            if (!err && this.hasItem)
+                this.sink.emit(this.item);
+            this.sink.end(err);
         }
     };
     Asyncplify.prototype.map = function (mapper) {
@@ -865,45 +845,42 @@
     Asyncplify.prototype.observeOn = function (options) {
         return new Asyncplify(ObserveOn, options, this);
     };
-    function ObserveOn(options, on, source) {
-        var self = this;
+    function ObserveOn(options, sink, source) {
         this.scheduler = (typeof options === 'function' ? options : options && options.scheduler || schedulers.immediate)();
-        this.scheduler.itemDone = function (err) {
-            self.scheduledItemDone(err);
-        };
-        this.on = on;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        on.source = this;
         source._subscribe(this);
     }
     ObserveOn.prototype = {
+        close: function () {
+            this.sink = NoopSink.instance;
+            if (this.source)
+                this.source.close();
+            if (this.scheduler)
+                this.scheduler.close();
+            this.source = null;
+        },
         emit: function (v) {
-            this.scheduler.schedule(new ObserveOnItem(v, true, this.on));
+            this.scheduler.schedule(new ObserveOnItem(v, true, this));
         },
         end: function (err) {
-            this.scheduler.schedule(new ObserveOnItem(err, false, this.on));
-        },
-        scheduledItemDone: function (err) {
-            if (err) {
-                this.scheduler.setState(CLOSED);
-                this.on.end(err);
-            }
-        },
-        setState: function (state) {
-            if (this.state !== state && this.state !== CLOSED) {
-                this.state = state;
-                this.scheduler.setState(state);
-            }
+            this.scheduler.schedule(new ObserveOnItem(err, false, this));
         }
     };
-    function ObserveOnItem(value, isEmit, on) {
+    function ObserveOnItem(value, isEmit, parent) {
         this.isEmit = isEmit;
-        this.on = on;
+        this.parent = parent;
         this.value = value;
     }
     ObserveOnItem.prototype = {
         action: function () {
-            this.isEmit ? this.on.emit(this.value) : this.on.end(this.value);
+            this.isEmit ? this.parent.sink.emit(this.value) : this.parent.sink.end(this.value);
+        },
+        error: function (err) {
+            var sink = this.parent.sink;
+            this.parent.close();
+            sink.end(err);
         },
         delay: 0
     };
