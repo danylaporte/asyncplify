@@ -1,4 +1,4 @@
-Asyncplify.prototype.scan = function (options, source, cb) {
+Asyncplify.prototype.scan = function (options) {
     return new Asyncplify(Scan, options, this);
 };
 
