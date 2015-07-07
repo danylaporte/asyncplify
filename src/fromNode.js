@@ -9,25 +9,19 @@ Asyncplify.fromNode = function (func) {
 };
 
 function FromNode(options, sink) {
-    this.called = false;
     this.sink = sink;
     this.sink.source = this;
     
     var self = this;
     
     function callback(err, value) {
-        
-        if (self.called) return;
-        self.called = true;
-        
-        if (!err) self.sink.emit(value);
+        self.sink.emit(value);
         self.sink.end(err);
     }
     
     try {
         options[0].apply(null, options[1].concat([callback]));
     } catch (ex) {
-        this.called = true;
         this.sink.end(ex);
     }
 }

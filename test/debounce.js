@@ -3,10 +3,10 @@ var tests = require('asyncplify-tests');
 
 describe('debounce', function () {
     asyncplify
-        .interval(5)
+        .interval(15)
         .debounce(10)
 		.take(1)
         .pipe(tests.itShouldClose())
         .pipe(tests.itShouldEndAsync())
-        .pipe(tests.itShouldEmitValues([2]));
+        .pipe(tests.itShouldEmitValues([0]));
 });
