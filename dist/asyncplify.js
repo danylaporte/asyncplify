@@ -353,12 +353,19 @@
         source._subscribe(this);
     }
     Filter.prototype = {
-        close: closeSinkSource,
+        close: function () {
+            this.sink = NoopSink.instance;
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: function (value) {
-            if (this.cond(value) && this.sink)
+            if (this.cond(value))
                 this.sink.emit(value);
         },
-        end: endSinkSource
+        end: function (err) {
+            this.sink.end(err);
+        }
     };
     Asyncplify.prototype.finally = function (action) {
         return action ? new Asyncplify(Finally, action, this) : this;
@@ -373,25 +380,22 @@
     }
     Finally.prototype = {
         close: function () {
+            this.sink = NoopSink.instance;
             if (this.source) {
                 this.source.close();
                 this.source = null;
                 this.registerProcessEnd(false);
                 this.action();
             }
-            this.sink = null;
         },
         emit: function (value) {
-            if (this.sink)
-                this.sink.emit(value);
+            this.sink.emit(value);
         },
         end: function (err) {
             this.source = null;
             this.registerProcessEnd(false);
             this.action();
-            if (this.sink)
-                this.sink.end(err);
-            this.sink = null;
+            this.sink.end(err);
         },
         registerProcessEnd: function (register) {
             if (typeof process === 'object') {
@@ -405,113 +409,129 @@
     Asyncplify.prototype.flatMap = function (options) {
         return new Asyncplify(FlatMap, options, this);
     };
-    function FlatMap(options, on, source) {
-        this.isPaused = false;
-        this.items = [];
+    function FlatMap(options, sink, source) {
+        this.isSubscribing = false;
         this.mapper = options.mapper || options;
         this.maxConcurrency = Math.max(options.maxConcurrency || 0, 0);
-        this.on = on;
-        this.state = RUNNING;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        on.source = this;
+        this.sources = [];
+        this.subscriptions = [];
         source._subscribe(this);
     }
     FlatMap.prototype = {
         childEnd: function (err, item) {
-            var count = this.items.length;
-            removeItem(this.items, item);
-            if (err) {
-                this.setState(CLOSED);
-                this.on.end(err);
-            } else if (!this.items.length && !this.source) {
-                this.on.end(null);
-            } else if (this.source && this.maxConcurrency && count === this.maxConcurrency && this.isPaused) {
-                this.isPaused = false;
-                if (this.state === RUNNING)
-                    this.source.setState(RUNNING);
-            }
+            removeItem(this.subscriptions, item);
+            this.subscribe(err);
+        },
+        close: function () {
+            if (this.source)
+                this.source.close();
+            for (var i = 0; i < this.subscriptions.length; i++)
+                this.subscriptions[i].close();
+            this.mapper = noop;
+            this.sink = NoopSink.instance;
+            this.source = null;
+            this.sources.length = 0;
+            this.subscriptions.length = 0;
         },
         emit: function (v) {
             var item = this.mapper(v);
             if (item) {
-                var flatMapItem = new FlatMapItem(this);
-                this.items.push(flatMapItem);
-                if (this.maxConcurrency && this.items.length >= this.maxConcurrency && !this.isPaused) {
-                    this.isPaused = true;
-                    this.source.setState(PAUSED);
-                }
-                item._subscribe(flatMapItem);
+                this.sources.push(item);
+                this.subscribe(null);
             }
         },
         end: function (err) {
             this.source = null;
-            if (err)
-                this.setState(CLOSED);
-            if (err || !this.items.length)
-                this.on.end(err);
+            this.subscribe(err);
         },
-        setState: function (state) {
-            if (this.state !== state && this.state !== CLOSED) {
-                this.state = state;
-                if (this.source && !this.isPaused)
-                    this.source.setState(state);
-                for (var i = 0; i < this.items.length && this.state === state; i++) {
-                    this.items[i].setState(state);
+        subscribe: function (err) {
+            var sink = this.sink;
+            if (err) {
+                this.close();
+                sink.end(err);
+            } else if (!this.isSubscribing) {
+                this.isSubscribing = true;
+                while (this.sources.length && (this.maxConcurrency < 1 || (this.source ? 1 : 0) + this.subscriptions.length < this.maxConcurrency)) {
+                    var item = new FlatMapItem(this);
+                    this.subscriptions.push(item);
+                    this.sources.shift()._subscribe(item);
+                }
+                this.isSubscribing = false;
+                if (!this.sources.length && !this.subscriptions.length && !this.source) {
+                    this.mapper = noop;
+                    this.sink = NoopSink.instance;
+                    sink.end(null);
                 }
             }
         }
     };
-    function FlatMapItem(on) {
-        this.on = on;
+    function FlatMapItem(parent) {
+        this.parent = parent;
         this.source = null;
     }
     FlatMapItem.prototype = {
+        close: function () {
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: function (v) {
-            this.on.on.emit(v);
+            this.parent.sink.emit(v);
         },
         end: function (err) {
-            this.on.childEnd(err, this);
-        },
-        setState: setStateThru
+            this.parent.childEnd(err, this);
+        }
     };
     Asyncplify.prototype.flatMapLatest = function (options) {
         return new Asyncplify(FlatMapLatest, options, this);
     };
-    function FlatMapLatest(options, on, source) {
-        this.item = null;
-        this.mapper = options.mapper || options;
-        this.maxConcurrency = Math.max(options.maxConcurrency || 0, 0);
-        this.on = on;
+    function FlatMapLatest(options, sink, source) {
+        this.mapper = options || identity;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        on.source = this;
+        this.subscription = null;
         source._subscribe(this);
     }
     FlatMapLatest.prototype = {
         childEnd: function (err, item) {
-            this.item = null;
-            if (err) {
-                this.setState(CLOSED);
-                this.on.end(err);
-            } else if (!this.source) {
-                this.on.end(null);
+            this.subscription = null;
+            if (err && this.source) {
+                this.source.close();
+                this.source = null;
+                this.mapper = noop;
             }
+            if (err || !this.source)
+                this.sink.end(err);
+        },
+        close: function () {
+            if (this.source)
+                this.source.close();
+            if (this.subscription)
+                this.subscription.close();
+            this.source = this.subscription = null;
         },
         emit: function (v) {
             var item = this.mapper(v);
             if (item) {
-                this.item && this.item.setState(CLOSED);
-                this.item = new FlatMapItem(this);
-                item._subscribe(this.item);
+                if (this.subscription)
+                    this.subscription.close();
+                this.subscription = new FlatMapItem(this);
+                item._subscribe(this.subscription);
             }
         },
         end: function (err) {
+            this.mapper = noop;
             this.source = null;
-            err && this.setState(CLOSED);
-            (err || !this.item) && this.on.end(err);
-        },
-        setState: function (state) {
-            this.source && this.source.setState(state);
-            this.item && this.item.setState(state);
+            if (err && this.subscription) {
+                this.subscription.close();
+                this.subscription = null;
+            }
+            if (err || !this.subscription)
+                this.sink.end(err);
         }
     };
     Asyncplify.fromArray = function (array) {
@@ -564,87 +584,67 @@
     Asyncplify.fromPromise = function (promise, cb) {
         return new Asyncplify(FromPromise, promise);
     };
-    function FromPromise(promise, on) {
-        this.on = on;
-        this.resolved = 0;
-        this.state = RUNNING;
-        this.value = null;
-        on.source = this;
+    function FromPromise(promise, sink) {
+        this.sink = sink;
+        this.sink.source = this;
         var self = this;
         function resolve(v) {
-            if (self.state === RUNNING) {
-                self.state = CLOSED;
-                self.on.emit(v);
-                self.on.end(null);
-            } else {
-                self.resolved = 1;
-                self.value = v;
-            }
+            self.sink.emit(v);
+            self.sink.end(null);
         }
         function rejected(err) {
-            if (self.state === RUNNING) {
-                self.state = CLOSED;
-                self.on.end(err);
-            } else {
-                self.resolved = 2;
-                self.value = err;
-            }
+            self.sink.end(err);
         }
         promise.then(resolve, rejected);
     }
-    FromPromise.prototype = {
-        do: function () {
-            if (this.resolved === 1) {
-                this.state = CLOSED;
-                this.on.emit(this.value);
-                this.on.end(null);
-            } else if (this.resolved === 2) {
-                this.state = CLOSED;
-                this.on.end(this.value);
-            }
-        },
-        setState: setState
+    FromPromise.prototype.close = function () {
+        this.sink = NoopSink.instance;
     };
     Asyncplify.fromRx = function (obs) {
         return new Asyncplify(FromRx, obs);
     };
-    function FromRx(obs, on) {
-        on.source = this;
+    function FromRx(obs, sink) {
+        sink.source = this;
         function next(value) {
-            on.emit(value);
+            sink.emit(value);
         }
         function error(err) {
-            on.end(err);
+            sink.end(err);
         }
         function completed() {
-            on.end(null);
+            sink.end(null);
         }
         this.subscription = obs.subscribe(next, error, completed);
     }
-    FromRx.prototype.setState = function (state) {
-        if (state === CLOSED)
-            this.subscription.dispose();
+    FromRx.prototype.close = function () {
+        this.subscription.dispose();
     };
     Asyncplify.prototype.groupBy = function (options) {
         return new Asyncplify(GroupBy, options, this);
     };
-    function GroupBy(options, on, source) {
+    function GroupBy(options, sink, source) {
         this.elementSelector = options && options.elementSelector || identity;
         this.keySelector = typeof options === 'function' ? options : options && options.keySelector || identity;
-        this.on = on;
-        this.store = options && options.store || {};
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        on.source = this;
+        this.store = options && options.store || {};
         source._subscribe(this);
     }
     GroupBy.prototype = {
+        close: function () {
+            this.sink = NoopSink.instance;
+            if (this.source)
+                this.source.close();
+            this.source = null;
+        },
         emit: function (v) {
             var key = this.keySelector(v);
             var group = this.store[key];
             if (!group) {
                 group = this.store[key] = Asyncplify.subject();
                 group.key = key;
-                this.on.emit(group);
+                this.sink.emit(group);
             }
             group.emit(this.elementSelector(v));
         },
@@ -652,7 +652,7 @@
             for (var k in this.store) {
                 this.store[k].end(null);
             }
-            this.on.end(err);
+            this.sink.end(err);
         }
     };
     Asyncplify.prototype.ignoreElements = function () {
@@ -807,6 +807,7 @@
             this.sink.end(null);
     }
     Merge.prototype.close = function () {
+        this.sink = NoopSink.instance;
         for (var i = 0; i < this.subscriptions.length; i++)
             this.subscriptions[i].close();
         this.subscriptions.length = 0;
@@ -989,6 +990,7 @@
     }
     Scan.prototype = {
         close: function () {
+            this.sink = NoopSink.instance;
             if (this.source)
                 this.source.close();
             this.source = null;

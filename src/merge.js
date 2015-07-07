@@ -18,6 +18,8 @@ function Merge(options, sink) {
 }
 
 Merge.prototype.close = function () {
+    this.sink = NoopSink.instance;
+    
     for (var i = 0; i < this.subscriptions.length; i++)
         this.subscriptions[i].close();
 

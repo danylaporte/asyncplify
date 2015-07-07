@@ -1,27 +1,32 @@
 Asyncplify.prototype.groupBy = function(options) {
-    return new Asyncplify(GroupBy, options, this)
-}
+    return new Asyncplify(GroupBy, options, this);
+};
 
-function GroupBy(options, on, source) {
+function GroupBy(options, sink, source) {
     this.elementSelector = options && options.elementSelector || identity;
     this.keySelector = typeof options === 'function' ? options : (options && options.keySelector || identity);
-    this.on = on;
-    this.store = options && options.store || {};
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
+    this.store = options && options.store || {};
 
-    on.source = this;
     source._subscribe(this);
 }
 
 GroupBy.prototype = {
+    close: function () {
+        this.sink = NoopSink.instance;
+        if (this.source) this.source.close();
+        this.source = null;  
+    },
     emit: function (v) {
         var key = this.keySelector(v);
         var group = this.store[key];
 
         if (!group) {
-            group = this.store[key] = Asyncplify.subject()
+            group = this.store[key] = Asyncplify.subject();
             group.key = key;
-            this.on.emit(group);
+            this.sink.emit(group);
         }
 
         group.emit(this.elementSelector(v));
@@ -31,6 +36,6 @@ GroupBy.prototype = {
             this.store[k].end(null);
         }
 
-        this.on.end(err);
+        this.sink.end(err);
     }
-}
+};

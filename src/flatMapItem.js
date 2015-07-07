@@ -1,14 +1,17 @@
-function FlatMapItem(on) {
-    this.on = on;
+function FlatMapItem(parent) {
+    this.parent = parent;
     this.source = null;
 }
 
 FlatMapItem.prototype = {
+    close: function () {
+        if (this.source) this.source.close();
+        this.source = null;
+    },
     emit: function (v) {
-        this.on.on.emit(v);
+        this.parent.sink.emit(v);
     },
     end: function (err) {
-        this.on.childEnd(err, this);
-    },
-    setState: setStateThru
-}
+        this.parent.childEnd(err, this);
+    }
+};

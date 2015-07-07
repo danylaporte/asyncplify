@@ -1,44 +1,51 @@
 Asyncplify.prototype.flatMapLatest = function (options) {
-    return new Asyncplify(FlatMapLatest, options, this)
-}
+    return new Asyncplify(FlatMapLatest, options, this);
+};
 
-function FlatMapLatest(options, on, source) {
-    this.item = null;
-    this.mapper = options.mapper || options;
-    this.maxConcurrency = Math.max(options.maxConcurrency || 0, 0);
-    this.on = on;
+function FlatMapLatest(options, sink, source) {
+    this.mapper = options || identity;
+    this.sink = sink;
+    this.sink.source = this;
     this.source = null;
+    this.subscription = null;
 
-    on.source = this;
     source._subscribe(this);
 }
 
 FlatMapLatest.prototype = {
     childEnd: function (err, item) {
-        this.item = null;
+        this.subscription = null;
 
-        if (err) {
-            this.setState(CLOSED);
-            this.on.end(err);
-        } else if (!this.source) {
-            this.on.end(null);
+        if (err && this.source) {
+            this.source.close();
+            this.source = null;
+            this.mapper = noop;
         }
+
+        if (err || !this.source) this.sink.end(err);
+    },
+    close: function () {
+        if (this.source) this.source.close();
+        if (this.subscription) this.subscription.close();
+        this.source = this.subscription = null;
     },
     emit: function (v) {
         var item = this.mapper(v);
         if (item) {
-            this.item && this.item.setState(CLOSED);
-            this.item = new FlatMapItem(this);
-            item._subscribe(this.item);
+            if (this.subscription) this.subscription.close();
+            this.subscription = new FlatMapItem(this);
+            item._subscribe(this.subscription);
         }
     },
     end: function (err) {
+        this.mapper = noop;
         this.source = null;
-        err && this.setState(CLOSED);
-        (err || !this.item) && this.on.end(err);
-    },
-    setState: function (state) {
-        this.source && this.source.setState(state);
-        this.item && this.item.setState(state);
+
+        if (err && this.subscription) {
+            this.subscription.close();
+            this.subscription = null;
+        }
+
+        if (err || !this.subscription) this.sink.end(err);
     }
-}
+};

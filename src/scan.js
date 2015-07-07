@@ -18,6 +18,7 @@ function Scan(options, sink, source) {
 
 Scan.prototype = {
     close: function () {
+        this.sink = NoopSink.instance;
         if (this.source) this.source.close();
         this.source = null;
     },

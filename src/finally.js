@@ -14,28 +14,23 @@ function Finally(action, sink, source) {
 
 Finally.prototype = {
     close: function () {
+        this.sink = NoopSink.instance;
+        
         if (this.source) {
             this.source.close();
             this.source = null;
             this.registerProcessEnd(false);
             this.action();
         }
-        
-        this.sink = null;
     },
     emit: function (value) {
-        if (this.sink)
-            this.sink.emit(value);
+        this.sink.emit(value);
     },
     end: function (err) {
         this.source = null;
         this.registerProcessEnd(false);
         this.action();
-        
-        if (this.sink)
-            this.sink.end(err);
-            
-        this.sink = null;
+        this.sink.end(err);
     },
     registerProcessEnd: function (register) {
         if (typeof process === 'object') {

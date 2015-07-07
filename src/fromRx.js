@@ -2,16 +2,16 @@ Asyncplify.fromRx = function (obs) {
     return new Asyncplify(FromRx, obs);
 };
 
-function FromRx(obs, on) {
-    on.source = this;
+function FromRx(obs, sink) {
+    sink.source = this;
 
-	function next(value) { on.emit(value); }
-	function error(err) { on.end(err); }
-	function completed() { on.end(null); }
+	function next(value) { sink.emit(value); }
+	function error(err) { sink.end(err); }
+	function completed() { sink.end(null); }
 
 	this.subscription = obs.subscribe(next, error, completed);
 }
 
-FromRx.prototype.setState = function (state) {
-	if (state === CLOSED) this.subscription.dispose();
+FromRx.prototype.close = function () {
+	this.subscription.dispose();
 };

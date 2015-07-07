@@ -1,3 +1,4 @@
+require('source-map-support').install();
 var asyncplify = require('../dist/asyncplify');
 var tests = require('asyncplify-tests');
 
