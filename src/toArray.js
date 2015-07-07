@@ -67,10 +67,7 @@ ToArray.prototype = {
 
         if (this.trigger) this.trigger.close();
         this.trigger = null;
-        
-        var sink = this.sink;
-        this.sink = NoopSink.instance;
-        sink.end(err);
+        this.sink.end(err);
     },
     triggerEmit: function () {
         if (this.array.length || this.emitEmpty) this.emitArray();

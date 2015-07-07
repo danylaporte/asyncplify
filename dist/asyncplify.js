@@ -1542,9 +1542,7 @@
             if (this.trigger)
                 this.trigger.close();
             this.trigger = null;
-            var sink = this.sink;
-            this.sink = NoopSink.instance;
-            sink.end(err);
+            this.sink.end(err);
         },
         triggerEmit: function () {
             if (this.array.length || this.emitEmpty)
@@ -1704,11 +1702,10 @@
                 for (i = 0; i < subscriptions.length; i++) {
                     s = subscriptions[i];
                     if (!s.source && !s.items.length) {
+                        this.parent.mapper = noop;
                         this.parent.closeSubscriptions();
-                        var sink = this.parent.sink;
-                        this.parent.sink = null;
-                        if (sink)
-                            sink.end(null);
+                        this.parent.sink.end(null);
+                        this.parent.sink = NoopSink.instance;
                         break;
                     }
                 }
@@ -1716,16 +1713,17 @@
         },
         end: function (err) {
             this.source = null;
-            if ((err || !this.items.length) && this.parent.sink) {
-                var sink = this.parent.sink;
-                this.parent.sink = null;
-                sink.end(err);
+            if (err || !this.items.length) {
+                this.parent.mapper = noop;
+                this.parent.sink.end(err);
+                this.parent.sink = NoopSink.instance;
             }
         }
     };
     function AbsoluteTimeoutItem(context, item, dueTime) {
         this.context = context;
         this.dueTime = dueTime;
+        this.execute = item.error ? schedulerExecuteSafe : schedulerExecuteUnsafe;
         this.handle = null;
         this.item = item;
     }
@@ -1733,7 +1731,6 @@
         close: function () {
             clearTimeout(this.handle);
         },
-        execute: schedulerExecute,
         schedule: function () {
             var self = this;
             this.handle = setTimeout(function () {
@@ -1743,6 +1740,7 @@
     };
     function ImmediateTimeoutItem(context, item) {
         this.context = context;
+        this.execute = item.error ? schedulerExecuteSafe : schedulerExecuteUnsafe;
         this.handle = null;
         this.item = item;
     }
@@ -1750,7 +1748,6 @@
         close: function () {
             clearImmediate(this.handle);
         },
-        execute: schedulerExecute,
         schedule: function () {
             var self = this;
             this.handle = setImmediate(function () {
@@ -1761,6 +1758,7 @@
     function RelativeTimeoutItem(context, item, delay) {
         this.context = context;
         this.delay = delay || 0;
+        this.execute = item.error ? schedulerExecuteSafe : schedulerExecuteUnsafe;
         this.handle = null;
         this.item = item;
     }
@@ -1768,7 +1766,6 @@
         close: function () {
             clearTimeout(this.handle);
         },
-        execute: schedulerExecute,
         schedule: function () {
             var self = this;
             this.handle = setTimeout(function () {
@@ -1802,12 +1799,17 @@
             scheduleItem.schedule();
         }
     };
-    function schedulerExecute() {
+    function schedulerExecuteSafe() {
         removeItem(this.context.items, this);
-        //try {
-        this.item.action();    //} catch (ex) {
-                               //  this.item.error(ex);
-                               //}
+        try {
+            this.item.action();
+        } catch (ex) {
+            this.item.error(ex);
+        }
+    }
+    function schedulerExecuteUnsafe() {
+        removeItem(this.context.items, this);
+        this.item.action();
     }
     function immediateFactory(item) {
         return item.dueTime && item.dueTime > Date.now() ? new AbsoluteTimeoutItem(this, item, item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item, item.delay) : new ImmediateTimeoutItem(this, item);
@@ -1832,11 +1834,9 @@
     };
     function SyncItem(context, item) {
         this.context = context;
+        this.schedule = item.error ? schedulerExecuteSafe : schedulerExecuteUnsafe;
         this.item = item;
     }
-    SyncItem.prototype = {
-        close: noop,
-        schedule: schedulerExecute
-    };
+    SyncItem.prototype.close = noop;
 }());
 //# sourceMappingURL=asyncplify.js.map

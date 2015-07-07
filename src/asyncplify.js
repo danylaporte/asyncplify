@@ -6,4 +6,4 @@ function Asyncplify(func, arg, source) {
 
 Asyncplify.prototype._subscribe = function (observer) {
     new this._func(this._arg, observer, this._src, this);
-}
+};

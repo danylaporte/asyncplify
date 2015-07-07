@@ -18,7 +18,7 @@ function CombineLatest(options, sink) {
     for (i = 0; i < items.length; i++)
         this.values.push(undefined);
 
-    for ( i = 0; i < items.length; i++)
+    for (i = 0; i < items.length; i++)
         this.subscriptions.push(new CombineLatestItem(items[i], this, i));
         
     if (!items.length)

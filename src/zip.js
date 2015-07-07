@@ -67,11 +67,10 @@ ZipItem.prototype = {
                 s = subscriptions[i];
                 
                 if (!s.source && !s.items.length) {
+                    this.parent.mapper = noop;
                     this.parent.closeSubscriptions();
-                    
-                    var sink = this.parent.sink;
-                    this.parent.sink = null;
-                    if (sink) sink.end(null);
+                    this.parent.sink.end(null);
+                    this.parent.sink = NoopSink.instance;
                     break;
                 }
             }
@@ -80,10 +79,10 @@ ZipItem.prototype = {
     end: function (err) {
         this.source = null;
         
-        if ((err || !this.items.length) && this.parent.sink) {
-            var sink = this.parent.sink;
-            this.parent.sink = null;
-            sink.end(err);
+        if (err || !this.items.length) {
+            this.parent.mapper = noop;
+            this.parent.sink.end(err);
+            this.parent.sink = NoopSink.instance;
         }
     }
 };
