@@ -14,10 +14,8 @@ function Timeout(options, sink, source) {
 
     this.scheduler.schedule(this);
     
-    if (this.subscribable) {
-        this.subscribable._subscribe(this);
-        this.subscribable = null;
-    }
+    if (this.subscribable) this.subscribable._subscribe(this);
+    this.subscribable = null;
 }
 
 Timeout.prototype = {
@@ -30,7 +28,8 @@ Timeout.prototype = {
     close: function () {
         if (this.source) this.source.close();
         if (this.scheduler) this.scheduler.close();
-        this.sink = this.scheduler = this.source = null;
+        this.scheduler = this.source = null;
+        this.sink = NoopSink.instance;
     },
     emit: function (value) {
         if (this.scheduler) this.scheduler.close();
@@ -39,20 +38,15 @@ Timeout.prototype = {
     },
     end: function (err) {
         if (this.scheduler) this.scheduler.close();
-        this.source = this.scheduler = null;
-        
-        var sink = this.sink;
-        this.sink = null;
-        if (sink) sink.end(err);
+        this.source = this.scheduler = null;        
+        this.sink.end(err);
+        this.sink = NoopSink.instance;
     },
     error: function (err) {
         this.scheduler.close();
-        this.scheduler = null;
-        
         if (this.source) this.source.close();
-        this.source = null;
-        
-        if (this.sink) this.sink.end(err);
-        this.sink = null;
+        this.source = this.scheduler = null;
+        this.sink.end(err);
+        this.sink = NoopSink.instance;
     }
 };

@@ -1,5 +1,5 @@
 Asyncplify.prototype.take = function (count) {
-    return new Asyncplify(count ? Take : Empty, count, this);
+    return new Asyncplify(count > 0 ? Take : Empty, count, this);
 };
 
 function Take(count, sink, source) {
@@ -12,25 +12,24 @@ function Take(count, sink, source) {
 }
 
 Take.prototype = {
-    close: closeSinkSource,
+    close: function () {
+        if (this.source) this.source.close();
+        this.sink = NoopSink.instance;
+        this.source = null;
+    },
     emit: function (value) {
-        if (this.count-- && this.sink) {
+        if (this.count--) {
             this.sink.emit(value);
             
             if (!this.count) {
-                var source = this.source;
-                var sink = this.sink;
-                
+                this.source.close();
                 this.source = null;
-                this.sink = null;
-                
-                if (source)
-                    source.close();
-                    
-                if (sink)
-                    sink.end(null);
+                this.sink.end(null);
             }
         }
     },
-    end: endSinkSource
+    end: function (err) {
+        this.source = null;
+        this.sink.end(err);
+    }
 };

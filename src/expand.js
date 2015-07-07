@@ -2,87 +2,81 @@ Asyncplify.prototype.expand = function (selector) {
 	return new Asyncplify(Expand, selector, this);
 };
 
-function Expand(selector, on, source) {
+function Expand(mapper, sink, source) {
 	this.error = null;
 	this.items = [];
-    this.on = on;
-	this.selector = selector;
+	this.mapper = mapper || identity;
 	this.selectPending = false;
+	this.sink = sink;
+	this.sink.source = this;
     this.source = null;
-	this.state = RUNNING;
 	this.value = undefined;
 
-    on.source = this;
     source._subscribe(this);
 }
 
 Expand.prototype = {
-	callEnd: function () {
-		if (this.error || (!this.source && !this.items.length && !this.selectPending)) {
-			if (this.error) this.setState(CLOSED);
-			this.state === CLOSED;
-			this.on.end(this.error);
-		}
+	close: function () {
+		if (this.source) this.source.close();
+		this.mapper = noop;
+		this.source = null;
+		this.sink = NoopSink.instance;
 	},
-	do: function () {
-		if (this.state !== RUNNING) return;
+    emit: function (value) {
+		this.sink.emit(value);
 
-		this.doSelect();
-		this.callEnd();
-	},
-	doSelect: function () {
-		if (!this.selectPending) return;
-		var value = this.value;
-		
-		this.value = undefined;
-		this.selectPending = false;
-		
-		var source = this.selector(value);
+		var source = this.mapper(value);
 
 		if (source) {
 			var item = new ExpandItem(this);
 			this.items.push(item);
 			source._subscribe(item);
 		}
-	},
-    emit: function (value) {
-		this.on.emit(value);
-		this.selectPending = true;
-		this.value = value;
-		
-		if (this.state === RUNNING) this.doSelect();
     },
     end: function (err) {
 		this.source = null;
-		this.error = this.error || err;
-		this.callEnd();
-	},
-    setState: function (state) {
-		if (this.state !== state && this.state !== CLOSED) {
-			this.state = state;
 
-			if (this.source) this.source.setState(state);
+		if (err) {
+			for (var i = 0; i < this.items.length; i++)
+				this.items[i].close();
 
-			for (var i = this.items.length - 1; i > -1 && this.state === state; i--) {
-				this.items[i].setState(state);
-			}
+			this.items.length = 0;
+		}
 
-			this.doSelect();
+		if (!this.items.length) {
+			this.mapper = noop;
+			this.sink.end(err);
 		}
 	}
 };
 
-function ExpandItem(on) {
-	this.on = on;
+function ExpandItem(parent) {
+	this.parent = parent;
 	this.source = null;
 }
 
 ExpandItem.prototype = {
-	emit: emitThru,
-	end: function (err) {
-		removeItem(this.on.items, this);
-		this.on.error = this.on.error || err;
-		this.on.callEnd();
+	close: function () {
+		if (this.source) this.source.close();
+		this.source = null;
 	},
-	setState: setStateThru
+	emit: function (v) {
+		this.parent.emit(v);
+	},
+	end: function (err) {
+		this.source = null;
+		removeItem(this.parent.items, this);
+		
+		if (err) {
+			for (var i = 0; i < this.parent.items.length; i++)
+				this.parent.items[i].close();
+				
+			this.parent.items.length = 0;
+		}
+		
+		if (!this.parent.items.length && !this.source) {
+			this.parent.mapper = noop;
+			this.parent.sink.end(err);
+		}
+	}
 };

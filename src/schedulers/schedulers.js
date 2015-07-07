@@ -1,10 +1,10 @@
 function schedulerExecute() {
     removeItem(this.context.items, this);    
-    try {
+    //try {
         this.item.action();
-    } catch (ex) {
-        this.item.error(ex);
-    }
+    //} catch (ex) {
+      //  this.item.error(ex);
+    //}
 }
 
 function immediateFactory(item) {

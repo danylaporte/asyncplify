@@ -26,7 +26,9 @@ TakeUntil.prototype = {
     end: function (err) {
         if (this.trigger) this.trigger.close();
         this.source = this.trigger = null;
-        this.sink.end(err);
+        var sink = this.sink;
+        this.sink = NoopSink.instance;
+        sink.end(err);
     },
     triggerEmit: function () {
         if (this.source) this.source.close();

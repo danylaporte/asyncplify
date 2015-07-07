@@ -7,10 +7,9 @@ function Trigger(source, target) {
 
 Trigger.prototype = {
     close: function () {
-        this.closeSource();
-        this.target = null;
+        if (this.source) this.source.close();
+        this.source = this.target = null;
     },
-    closeSource: closeSource,
     emit: function (value) {
         if (this.target)
             this.target.triggerEmit(value);

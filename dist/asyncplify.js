@@ -1,15 +1,5 @@
 (function () {
     'use strict';
-    function ArrayIterator(array) {
-        this.array = array;
-        this.i = 0;
-    }
-    ArrayIterator.prototype.next = function () {
-        return {
-            done: this.i >= this.array.length,
-            value: this.i < this.array.length ? this.array[this.i++] : undefined
-        };
-    };
     function Asyncplify(func, arg, source) {
         this._arg = arg;
         this._func = func;
@@ -151,25 +141,14 @@
     Asyncplify.prototype.debounce = function (options) {
         return new Asyncplify(Debounce, options, this);
     };
-    function Debounce(options, on, source) {
-        this.endCalled = false;
+    function Debounce(options, sink, source) {
+        this.delay = options && options.delay || typeof options === 'number' && options || 0;
         this.itemPending = false;
-        this.on = on;
         this.scheduler = (options && options.scheduler || schedulers.timeout)();
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        this.state = RUNNING;
-        this.value = null;
-        var self = this;
-        this.item = {
-            action: function () {
-                self.action();
-            },
-            delay: options && options.delay || typeof options === 'number' && options || 0
-        };
-        on.source = this;
-        this.scheduler.itemDone = function (err) {
-            self.scheduledItemDone(err);
-        };
+        this.value = undefined;
         source._subscribe(this);
     }
     Debounce.prototype = {
@@ -177,40 +156,41 @@
             var v = this.value;
             this.itemPending = false;
             this.value = undefined;
-            this.on.emit(v);
+            this.sink.emit(v);
+            if (!this.source) {
+                if (this.scheduler)
+                    this.scheduler.close();
+                this.scheduler = null;
+                this.sink.end(null);
+                this.sink = NoopSink.instance;
+            }
+        },
+        close: function () {
+            if (this.source)
+                this.source.close();
+            if (this.scheduler)
+                this.scheduler.close();
+            this.source = this.scheduler = this.value = null;
+            this.sink = NoopSink.instance;
         },
         emit: function (value) {
             this.itemPending = true;
             this.value = value;
-            this.scheduler.cancel(this.item);
-            this.scheduler.schedule(this.item);
+            if (this.scheduler) {
+                this.scheduler.close();
+                this.scheduler.schedule(this);
+            }
         },
         end: function (err) {
-            this.endCalled = true;
+            this.source = null;
+            debugger;
             if (err || !this.itemPending) {
-                this.state = CLOSED;
-                this.scheduler.close();
-                this.on.end(err);
-            }
-        },
-        scheduledItemDone: function (err) {
-            if (err || this.endCalled && this.state === RUNNING) {
-                this.state = CLOSED;
-                this.on.end(err);
-            }
-        },
-        setState: function (state) {
-            if (this.state !== state && this.state !== CLOSED) {
-                this.state = state;
-                this.source.setState(state);
-                if (state === RUNNING) {
-                    if (this.itemPending)
-                        this.scheduler.setState(state);
-                    else if (this.endCalled) {
-                        this.state = CLOSED;
-                        this.on.end(null);
-                    }
-                }
+                if (this.scheduler)
+                    this.scheduler.close();
+                this.scheduler = null;
+                this.value = undefined;
+                this.sink.end(err);
+                this.sink = NoopSink.instance;
             }
         }
     };
@@ -256,82 +236,73 @@
     Asyncplify.prototype.expand = function (selector) {
         return new Asyncplify(Expand, selector, this);
     };
-    function Expand(selector, on, source) {
+    function Expand(mapper, sink, source) {
         this.error = null;
         this.items = [];
-        this.on = on;
-        this.selector = selector;
+        this.mapper = mapper || identity;
         this.selectPending = false;
+        this.sink = sink;
+        this.sink.source = this;
         this.source = null;
-        this.state = RUNNING;
         this.value = undefined;
-        on.source = this;
         source._subscribe(this);
     }
     Expand.prototype = {
-        callEnd: function () {
-            if (this.error || !this.source && !this.items.length && !this.selectPending) {
-                if (this.error)
-                    this.setState(CLOSED);
-                this.state === CLOSED;
-                this.on.end(this.error);
-            }
+        close: function () {
+            if (this.source)
+                this.source.close();
+            this.mapper = noop;
+            this.source = null;
+            this.sink = NoopSink.instance;
         },
-        do: function () {
-            if (this.state !== RUNNING)
-                return;
-            this.doSelect();
-            this.callEnd();
-        },
-        doSelect: function () {
-            if (!this.selectPending)
-                return;
-            var value = this.value;
-            this.value = undefined;
-            this.selectPending = false;
-            var source = this.selector(value);
+        emit: function (value) {
+            this.sink.emit(value);
+            var source = this.mapper(value);
             if (source) {
                 var item = new ExpandItem(this);
                 this.items.push(item);
                 source._subscribe(item);
             }
         },
-        emit: function (value) {
-            this.on.emit(value);
-            this.selectPending = true;
-            this.value = value;
-            if (this.state === RUNNING)
-                this.doSelect();
-        },
         end: function (err) {
             this.source = null;
-            this.error = this.error || err;
-            this.callEnd();
-        },
-        setState: function (state) {
-            if (this.state !== state && this.state !== CLOSED) {
-                this.state = state;
-                if (this.source)
-                    this.source.setState(state);
-                for (var i = this.items.length - 1; i > -1 && this.state === state; i--) {
-                    this.items[i].setState(state);
-                }
-                this.doSelect();
+            if (err) {
+                for (var i = 0; i < this.items.length; i++)
+                    this.items[i].close();
+                this.items.length = 0;
+            }
+            if (!this.items.length) {
+                this.mapper = noop;
+                this.sink.end(err);
             }
         }
     };
-    function ExpandItem(on) {
-        this.on = on;
+    function ExpandItem(parent) {
+        this.parent = parent;
         this.source = null;
     }
     ExpandItem.prototype = {
-        emit: emitThru,
-        end: function (err) {
-            removeItem(this.on.items, this);
-            this.on.error = this.on.error || err;
-            this.on.callEnd();
+        close: function () {
+            if (this.source)
+                this.source.close();
+            this.source = null;
         },
-        setState: setStateThru
+        emit: function (v) {
+            this.parent.emit(v);
+        },
+        end: function (err) {
+            this.source = null;
+            removeItem(this.parent.items, this);
+            if (err) {
+                for (var i = 0; i < this.parent.items.length; i++)
+                    this.parent.items[i].close();
+                this.parent.items.length = 0;
+            }
+            if (!this.parent.items.length && !this.source) {
+                this.parent.mapper = noop;
+                this.parent.sink.end(err);
+            }
+        }
     };
     if (typeof module !== 'undefined') {
         module.exports = Asyncplify;
@@ -411,7 +382,7 @@
     };
     function FlatMap(options, sink, source) {
         this.isSubscribing = false;
-        this.mapper = options.mapper || options;
+        this.mapper = options.mapper || options || identity;
         this.maxConcurrency = Math.max(options.maxConcurrency || 0, 0);
         this.sink = sink;
         this.sink.source = this;
@@ -694,39 +665,24 @@
         return new Asyncplify(Interval, options);
     };
     function Interval(options, sink) {
-        var self = this;
         this.i = 0;
-        this.item = {
-            action: function () {
-                self.action();
-            },
-            delay: options && options.delay || typeof options === 'number' && options || 0,
-            error: function (err) {
-                self.error(err);
-            }
-        };
-        this.schedulerContext = (options && options.scheduler || schedulers.timeout)();
+        this.delay = options && options.delay || typeof options === 'number' && options || 0;
+        this.scheduler = (options && options.scheduler || schedulers.timeout)();
         this.sink = sink;
         this.sink.source = this;
-        this.schedulerContext.schedule(this.item);
+        this.scheduler.schedule(this);
     }
     Interval.prototype = {
         action: function () {
-            if (this.sink) {
-                this.sink.emit(this.i++);
-                if (this.schedulerContext)
-                    this.schedulerContext.schedule(this.item);
-            }
+            this.sink.emit(this.i++);
+            if (this.scheduler)
+                this.scheduler.schedule(this);
         },
         close: function () {
-            this.sink = null;
-            this.closeSchedulerContext();
-        },
-        closeSchedulerContext: closeSchedulerContext,
-        endSink: endSink,
-        error: function (err) {
-            this.closeSchedulerContext();
-            this.endSink(err);
+            this.sink = NoopSink.instance;
+            if (this.scheduler)
+                this.scheduler.close();
+            this.scheduler = null;
         }
     };
     Asyncplify.prototype.last = function (cond) {
@@ -1329,7 +1285,7 @@
         }
     };
     Asyncplify.prototype.take = function (count) {
-        return new Asyncplify(count ? Take : Empty, count, this);
+        return new Asyncplify(count > 0 ? Take : Empty, count, this);
     };
     function Take(count, sink, source) {
         this.count = count;
@@ -1339,23 +1295,26 @@
         source._subscribe(this);
     }
     Take.prototype = {
-        close: closeSinkSource,
+        close: function () {
+            if (this.source)
+                this.source.close();
+            this.sink = NoopSink.instance;
+            this.source = null;
+        },
         emit: function (value) {
-            if (this.count-- && this.sink) {
+            if (this.count--) {
                 this.sink.emit(value);
                 if (!this.count) {
-                    var source = this.source;
-                    var sink = this.sink;
+                    this.source.close();
                     this.source = null;
-                    this.sink = null;
-                    if (source)
-                        source.close();
-                    if (sink)
-                        sink.end(null);
+                    this.sink.end(null);
                 }
             }
         },
-        end: endSinkSource
+        end: function (err) {
+            this.source = null;
+            this.sink.end(err);
+        }
     };
     Asyncplify.prototype.takeUntil = function (trigger) {
         return new Asyncplify(TakeUntil, trigger, this);
@@ -1385,7 +1344,9 @@
             if (this.trigger)
                 this.trigger.close();
             this.source = this.trigger = null;
-            this.sink.end(err);
+            var sink = this.sink;
+            this.sink = NoopSink.instance;
+            sink.end(err);
         },
         triggerEmit: function () {
             if (this.source)
@@ -1408,23 +1369,28 @@
         source._subscribe(this);
     }
     TakeWhile.prototype = {
-        close: closeSinkSource,
+        close: function () {
+            if (this.source)
+                this.source.close();
+            this.cond = noop;
+            this.source = null;
+            this.sink = NoopSink.instance;
+        },
         emit: function (value) {
-            if (this.sink && this.cond(value) && this.sink)
+            if (this.cond(value)) {
                 this.sink.emit(value);
-            else if (this.sink) {
-                var sink = this.sink;
-                var source = this.source;
-                this.sink = null;
+            } else {
+                this.source.close();
                 this.source = null;
-                if (source)
-                    source.close();
-                if (sink)
-                    sink.end(null);
-                ;
+                this.cond = noop;
+                this.sink.end(null);
             }
         },
-        end: endSinkSource
+        end: function (err) {
+            this.source = null;
+            this.cond = noop;
+            this.sink.end(err);
+        }
     };
     Asyncplify.prototype.tap = function (options) {
         return new Asyncplify(Tap, options, this);
@@ -1479,10 +1445,9 @@
         this.source = null;
         this.subscribable = source;
         this.scheduler.schedule(this);
-        if (this.subscribable) {
+        if (this.subscribable)
             this.subscribable._subscribe(this);
-            this.subscribable = null;
-        }
+        this.subscribable = null;
     }
     Timeout.prototype = {
         action: function () {
@@ -1497,7 +1462,8 @@
                 this.source.close();
             if (this.scheduler)
                 this.scheduler.close();
-            this.sink = this.scheduler = this.source = null;
+            this.scheduler = this.source = null;
+            this.sink = NoopSink.instance;
         },
         emit: function (value) {
             if (this.scheduler)
@@ -1509,20 +1475,16 @@
             if (this.scheduler)
                 this.scheduler.close();
             this.source = this.scheduler = null;
-            var sink = this.sink;
-            this.sink = null;
-            if (sink)
-                sink.end(err);
+            this.sink.end(err);
+            this.sink = NoopSink.instance;
         },
         error: function (err) {
             this.scheduler.close();
-            this.scheduler = null;
             if (this.source)
                 this.source.close();
-            this.source = null;
-            if (this.sink)
-                this.sink.end(err);
-            this.sink = null;
+            this.source = this.scheduler = null;
+            this.sink.end(err);
+            this.sink = NoopSink.instance;
         }
     };
     Asyncplify.prototype.toArray = function (options, source, cb) {
@@ -1641,16 +1603,27 @@
     }
     Trigger.prototype = {
         close: function () {
-            this.closeSource();
-            this.target = null;
+            if (this.source)
+                this.source.close();
+            this.source = this.target = null;
         },
-        closeSource: closeSource,
         emit: function (value) {
             if (this.target)
                 this.target.triggerEmit(value);
         },
         end: noop
     };
+    function condTrue() {
+        return true;
+    }
+    function condFalse() {
+        return false;
+    }
+    function identity(v) {
+        return v;
+    }
+    function noop() {
+    }
     function NoopSink() {
     }
     NoopSink.prototype = {
@@ -1659,59 +1632,6 @@
         end: noop
     };
     NoopSink.instance = new NoopSink();
-    function closeSchedulerContext() {
-        var schedulerContext = this.schedulerContext;
-        if (schedulerContext) {
-            this.schedulerContext = null;
-            schedulerContext.close();
-        }
-    }
-    function closeSource() {
-        var source = this.source;
-        if (source) {
-            this.source = null;
-            source.close();
-        }
-    }
-    function closeSink() {
-        this.sink = null;
-    }
-    function closeSinkSource() {
-        this.sink = null;
-        if (this.source) {
-            this.source.close();
-            this.source = null;
-        }
-    }
-    function condTrue() {
-        return true;
-    }
-    function condFalse() {
-        return false;
-    }
-    function emitThru(value) {
-        if (this.sink)
-            this.sink.emit(value);
-    }
-    function endSink(err) {
-        var sink = this.sink;
-        if (sink) {
-            this.sink = null;
-            sink.end(err);
-        }
-    }
-    function endThru() {
-        throw new Error('Deprecated');
-    }
-    function endSinkSource(err) {
-        this.source = null;
-        this.endSink(err);
-    }
-    function identity(v) {
-        return v;
-    }
-    function noop() {
-    }
     function removeItem(items, item) {
         for (var i = 0; i < items.length; i++) {
             if (items[i] === item) {
@@ -1719,32 +1639,6 @@
                 break;
             }
         }
-    }
-    function setCountAndCond(self, options) {
-        switch (typeof options) {
-        case 'number':
-            self.count = options;
-            break;
-        case 'function':
-            self.cond = options;
-            break;
-        default:
-            if (options) {
-                if (typeof options.count === 'number')
-                    self.count = options.count;
-                self.cond = options.cond || condTrue;
-            }
-            break;
-        }
-    }
-    function setState(state) {
-        if (this.state !== CLOSED && this.state !== state) {
-            this.state = state;
-            this.state === RUNNING && this.do();
-        }
-    }
-    function setStateThru(state) {
-        this.source.setState(state);
     }
     Asyncplify.value = function (value) {
         return new Asyncplify(Value, value);
@@ -1894,10 +1788,19 @@
     }
     ScheduleContext.prototype = {
         close: function (item) {
-            for (var i = 0; i < this.items.length; i++) {
-                this.items[i].close();
+            var i;
+            if (item) {
+                for (i = 0; i < this.items.length; i++)
+                    if (this.items[i].item === item) {
+                        this.items[i].close();
+                        this.items.splice(i);
+                        return;
+                    }
+            } else {
+                for (i = 0; i < this.items.length; i++)
+                    this.items[i].close();
+                this.items.length = 0;
             }
-            this.items.length = 0;
         },
         schedule: function (item) {
             var scheduleItem = this.factory(item);
@@ -1907,11 +1810,10 @@
     };
     function schedulerExecute() {
         removeItem(this.context.items, this);
-        try {
-            this.item.action();
-        } catch (ex) {
-            this.item.error(ex);
-        }
+        //try {
+        this.item.action();    //} catch (ex) {
+                               //  this.item.error(ex);
+                               //}
     }
     function immediateFactory(item) {
         return item.dueTime && item.dueTime > Date.now() ? new AbsoluteTimeoutItem(this, item, item.dueTime) : item.delay && item.delay > 0 ? new RelativeTimeoutItem(this, item, item.delay) : new ImmediateTimeoutItem(this, item);
