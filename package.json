@@ -1,6 +1,6 @@
 {
   "name": "asyncplify",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "FRP (functional reactive programming) library for Javascript",
   "main": "dist/asyncplify.js",
   "scripts": {
@@ -22,19 +22,19 @@
   "dependencies": {},
   "devDependencies": {
     "asyncplify-tests": "^1.0.1",
-    "bluebird": "^2.9.30",
+    "bluebird": "^2.9.33",
     "gulp": "^3.9.0",
     "gulp-bench": "^1.1.0",
-    "gulp-concat": "^2.5.2",
-    "gulp-mocha": "^2.1.1",
+    "gulp-concat": "^2.6.0",
+    "gulp-mocha": "^2.1.2",
     "gulp-sourcemaps": "^1.5.2",
-    "gulp-spawn-mocha": "^2.0.1",
+    "gulp-spawn-mocha": "^2.2.1",
     "gulp-uglify": "^1.2.0",
-    "gulp-wrap-js": "^0.2.2",
+    "gulp-wrap-js": "^0.3.0",
     "mocha": "^2.2.5",
     "rx": "^2.5.3",
-    "should": "^6.0.3",
-    "source-map-support": "^0.3.1",
+    "should": "^7.0.2",
+    "source-map-support": "^0.3.2",
     "transducers-js": "^0.4.174"
   }
 }
