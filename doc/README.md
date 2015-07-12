@@ -1,3 +1,35 @@
+### concat(sources)
+Returns all items from the specified sources sequentially.
+
+sources:
+- an array containings source observables.
+
+Example:
+```js
+asyncplify
+	.concat([
+		asyncplify.value(0),
+		asyncplify.fromArray([1, 2])
+	])
+	.subscribe(console.log.bind(console));
+	// 0
+	// 1
+	// 2
+	// end.
+```
+
+Example with the instance operator:
+```js
+asyncplify
+	.value(0)
+	.concat([asyncplify.fromArray([1, 2])])
+	.subscribe(console.log.bind(console));
+	// 0
+	// 1
+	// 2
+	// end.
+```
+
 ### count(options)
 Returns the count based on a condition.
 
@@ -113,8 +145,8 @@ asyncplify
 	// end.
 ```
 
-### Handle backpressure with Pause, Resume, Close
-Every subscription to asyncplify source can be paused, resume or close.
+### Closing a subscription
+Every subscription to asyncplify source can be close.
 
 
 ```js
@@ -125,18 +157,11 @@ var subscription = asyncplify
         console.log(x);
         
         if (x === 2) 
-            subscription.pause();
+            subscription.close();
     });
-
-setTimeout(function () {
-    subscription.resume();
-}, 1000);
 
 // 0
 // 1
 // 2
-// (will be paused for 1000 ms)
-// 3
-// 4
-// end.
+// (will be closed here so that no more emit/end event will be sent)
 ```
