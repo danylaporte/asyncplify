@@ -30,6 +30,29 @@ asyncplify
 	// end.
 ```
 
+### concatMap(mapper)
+Concat sequentially all items returns by the mapper.
+
+mapper:
+- a function that create an observable on each item.
+
+Example:
+```js
+asyncplify
+	.fromArray([1, 2, 3])
+	.concatMap(function (x) {
+		return asyncplify.range(x);
+	})
+	.subscribe(console.log.bind(console));
+	// 0
+	// 0
+	// 1
+	// 0
+	// 1
+	// 2
+	// end.
+```
+
 ### count(options)
 Returns the count based on a condition.
 
