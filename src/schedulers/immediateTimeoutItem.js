@@ -11,6 +11,6 @@ ImmediateTimeoutItem.prototype = {
     },
     schedule: function () {
         var self = this;
-        this.handle = setImmediate(function () { self.execute(); });
+        this.handle = setImmediate(function handleImmediate() { self.execute(); });
     }
 };

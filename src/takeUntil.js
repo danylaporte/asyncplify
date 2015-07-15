@@ -14,29 +14,22 @@ function TakeUntil(trigger, sink, source) {
 }
 
 TakeUntil.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        if (this.trigger) this.trigger.close();
-        this.source = this.trigger = null;  
-    },
     emit: function (value) {
         this.sink.emit(value);
     },
     end: function (err) {
-        if (this.trigger) this.trigger.close();
+        if (this.trigger) this.trigger.setState(Asyncplify.states.CLOSED);
         this.source = this.trigger = null;
-        var sink = this.sink;
-        this.sink = NoopSink.instance;
-        sink.end(err);
+        this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
+        if (this.trigger) this.trigger.setState(state);
     },
     triggerEmit: function () {
-        if (this.source) this.source.close();
-        this.trigger.close();
+        if (this.source) this.source.setState(Asyncplify.states.CLOSED);
+        this.trigger.setState(Asyncplify.states.CLOSED);
         this.source = this.trigger = null;
-        
-        var sink = this.sink;
-        this.sink = NoopSink.instance;
-        sink.end(null);
+        this.sink.end(null);
     }
 };

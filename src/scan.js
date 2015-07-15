@@ -17,18 +17,16 @@ function Scan(options, sink, source) {
 }
 
 Scan.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (value) {
         this.acc = this.mapper(this.acc, value);
         this.sink.emit(this.acc);
     },
     end: function (err) {
-        this.mapper = null;
+        this.mapper = noop;
         this.source = null;
         this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

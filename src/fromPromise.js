@@ -20,6 +20,7 @@ function FromPromise(promise, sink) {
     promise.then(resolve, rejected);
 }
 
-FromPromise.prototype.close = function () {
-    this.sink = NoopSink.instance;  
+FromPromise.prototype.setState = function (state) {
+    if (state === Asyncplify.states.CLOSED)
+        this.sink = NoopSink.instance;  
 };

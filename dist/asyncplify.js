@@ -8,6 +8,11 @@
     Asyncplify.prototype._subscribe = function (observer) {
         new this._func(this._arg, observer, this._src, this);
     };
+    Asyncplify.states = {
+        RUNNING: 0,
+        PAUSED: 1,
+        CLOSED: 2
+    };
     Asyncplify.prototype.catch = function (options) {
         return new Asyncplify(Catch, options, this);
     };
@@ -24,13 +29,6 @@
         source._subscribe(this);
     }
     Catch.prototype = {
-        close: function () {
-            this.mapper = noop;
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
             this.sink.emit(value);
         },
@@ -41,11 +39,15 @@
                 if (source && this.sink)
                     return source._subscribe(this);
             }
+            this.mapper = null;
             this.sink.end(err);
-            this.sink = NoopSink.instance;
         },
         mapper: function () {
             return this.i < this.sources.length && this.sources[this.i++];
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.combineLatest = function (options) {
@@ -68,10 +70,9 @@
         if (!items.length)
             this.sink.end(null);
     }
-    CombineLatest.prototype.close = function () {
-        this.sink = NoopSink.instance;
+    CombineLatest.prototype.setState = function (state) {
         for (var i = 0; i < this.subscriptions.length; i++)
-            this.subscriptions[i].close();
+            this.subscriptions[i].setState(state);
         this.subscriptions.length = 0;
     };
     function CombineLatestItem(source, parent, index) {
@@ -82,11 +83,6 @@
         source._subscribe(this);
     }
     CombineLatestItem.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (v) {
             this.parent.values[this.index] = v;
             if (!this.hasValue) {
@@ -104,8 +100,12 @@
             if (err || !this.parent.closableCount) {
                 this.parent.sink.end(err);
                 if (err)
-                    this.parent.close();
+                    this.parent.setState(Asyncplify.states.CLOSED);
             }
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.concat = function (sources) {
@@ -115,27 +115,18 @@
         return new Asyncplify(Concat, [this].concat(sources));
     };
     function Concat(sources, sink) {
-        this.isSubscribing = true;
+        this.isSubscribing = false;
         this.sink = sink;
         this.sink.source = this;
         this.source = null;
         this.sources = (sources || []).concat();
-        if (!this.sources.length) {
+        this.state = Asyncplify.states.RUNNING;
+        if (this.sources.length)
+            this.subscribe();
+        else
             this.sink.end(null);
-        } else {
-            while (this.sources.length && !this.source)
-                this.sources.shift()._subscribe(this);
-            this.isSubscribing = false;
-        }
     }
     Concat.prototype = {
-        close: function () {
-            this.sink = null;
-            this.sources.length = 0;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
             this.sink.emit(value);
         },
@@ -144,10 +135,25 @@
             if (err || !this.sources.length) {
                 this.sources.length = 0;
                 this.sink.end(err);
-            } else if (!this.isSubscribing) {
-                this.isSubscribing = true;
-                this.sources.shift()._subscribe(this);
-                this.isSubscribing = false;
+            } else {
+                this.subscribe();
+            }
+        },
+        setState: function (state) {
+            if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
+                this.state = state;
+                if (this.source)
+                    this.source.setState(state);
+                this.subscribe();
+            }
+        },
+        subscribe: function () {
+            if (!this.isSubscribing) {
+                while (this.sources.length && !this.source && this.state === Asyncplify.states.RUNNING) {
+                    this.isSubscribing = true;
+                    this.sources.shift()._subscribe(this);
+                    this.isSubscribing = false;
+                }
             }
         }
     };
@@ -162,6 +168,7 @@
         this.sink = sink;
         this.sink.source = this;
         this.source = null;
+        this.state = Asyncplify.states.RUNNING;
         source._subscribe(this);
     }
     ConcatMap.prototype = {
@@ -170,39 +177,39 @@
             if (err || !this.items.length && !this.source) {
                 this.items.length = 0;
                 if (this.source)
-                    this.source.close();
+                    this.source.setState(Asyncplify.states.CLOSED);
                 this.source = null;
                 this.sink.end(err);
             } else if (!this.isSubscribing) {
                 this.subscribe();
             }
         },
-        close: function () {
-            this.sink = NoopSink.instance;
-            this.items.length = 0;
-            if (this.mapItem)
-                this.mapItem.close();
-            if (this.source)
-                this.source.close();
-            this.source = this.mapItem = null;
-        },
         emit: function (value) {
             this.items.push(this.mapper(value));
-            if (!this.mapItem)
-                this.subscribe();
+            this.subscribe();
         },
         end: function (err) {
             this.source = null;
             if (err || !this.mapItem && !this.items.length) {
                 if (this.mapItem)
-                    this.mapItem.close();
+                    this.mapItem.setState(Asyncplify.states.CLOSED);
                 this.mapItem = null;
                 this.items.length = 0;
                 this.sink.end(err);
             }
         },
+        setState: function (state) {
+            if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
+                this.state = state;
+                if (this.mapItem)
+                    this.mapItem.setState(state);
+                if (this.source)
+                    this.source.setState(state);
+                this.subscribe();
+            }
+        },
         subscribe: function () {
-            while (this.items.length && !this.mapItem) {
+            while (!this.mapItem && this.items.length && this.state === Asyncplify.states.RUNNING) {
                 this.isSubscribing = true;
                 this.mapItem = new FlatMapItem(this);
                 this.items.shift()._subscribe(this.mapItem);
@@ -222,12 +229,6 @@
         source._subscribe(this);
     }
     Count.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
             if (this.cond(value))
                 this.value++;
@@ -237,7 +238,10 @@
             if (!err)
                 this.sink.emit(this.value);
             this.sink.end(err);
-            this.sink = NoopSink.instance;
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.debounce = function (options) {
@@ -260,40 +264,28 @@
             this.value = undefined;
             this.sink.emit(v);
             if (!this.source) {
-                if (this.scheduler)
-                    this.scheduler.close();
-                this.scheduler = null;
+                this.scheduler.setState(Asyncplify.states.CLOSED);
                 this.sink.end(null);
-                this.sink = NoopSink.instance;
             }
-        },
-        close: function () {
-            if (this.source)
-                this.source.close();
-            if (this.scheduler)
-                this.scheduler.close();
-            this.source = this.scheduler = this.value = null;
-            this.sink = NoopSink.instance;
         },
         emit: function (value) {
             this.itemPending = true;
             this.value = value;
-            if (this.scheduler) {
-                this.scheduler.close();
-                this.scheduler.schedule(this);
-            }
+            this.scheduler.reset();
+            this.scheduler.schedule(this);
         },
         end: function (err) {
             this.source = null;
-            debugger;
             if (err || !this.itemPending) {
-                if (this.scheduler)
-                    this.scheduler.close();
-                this.scheduler = null;
+                this.scheduler.setState(Asyncplify.states.CLOSED);
                 this.value = undefined;
                 this.sink.end(err);
-                this.sink = NoopSink.instance;
             }
+        },
+        setState: function (state) {
+            this.scheduler.setState(state);
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.defaultIfEmpty = function (value) {
@@ -308,23 +300,19 @@
         source._subscribe(this);
     }
     DefaultIfEmpty.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
             this.hasValue = true;
-            if (this.sink)
-                this.sink.emit(value);
+            this.sink.emit(value);
         },
         end: function (err) {
             this.source = null;
             if (!this.hasValue && !err)
                 this.sink.emit(this.value);
             this.sink.end(err);
-            this.sink = NoopSink.instance;
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.empty = function () {
@@ -334,10 +322,12 @@
         sink.source = this;
         sink.end(null);
     }
-    Empty.prototype.close = noop;
+    Empty.prototype.setState = noop;
     Asyncplify.prototype.expand = function (selector) {
         return new Asyncplify(Expand, selector, this);
     };
+    //TODO Add isSubscribing to expand
+    //TODO Better implement pause 
     function Expand(mapper, sink, source) {
         this.error = null;
         this.items = [];
@@ -345,38 +335,42 @@
         this.selectPending = false;
         this.sink = sink;
         this.sink.source = this;
+        this.state = Asyncplify.states.RUNNING;
         this.source = null;
+        this.subscribables = [];
         this.value = undefined;
         source._subscribe(this);
     }
     Expand.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.mapper = noop;
-            this.source = null;
-            this.sink = NoopSink.instance;
-        },
         emit: function (value) {
-            this.sink.emit(value);
-            var source = this.mapper(value);
-            if (source) {
-                var item = new ExpandItem(this);
-                this.items.push(item);
-                source._subscribe(item);
+            if (this.state !== Asyncplify.states.CLOSED) {
+                this.sink.emit(value);
+                var source = this.mapper(value);
+                if (source) {
+                    var item = new ExpandItem(this);
+                    this.items.push(item);
+                    source._subscribe(item);
+                }
             }
         },
         end: function (err) {
             this.source = null;
             if (err) {
                 for (var i = 0; i < this.items.length; i++)
-                    this.items[i].close();
+                    this.items[i].setState(Asyncplify.states.CLOSED);
                 this.items.length = 0;
             }
             if (!this.items.length) {
                 this.mapper = noop;
                 this.sink.end(err);
             }
+        },
+        setState: function (state) {
+            this.state = state;
+            if (this.source)
+                this.source.setState(state);
+            for (var i = 0; i < this.items.length; i++)
+                this.items[i].setState(state);
         }
     };
     function ExpandItem(parent) {
@@ -384,11 +378,6 @@
         this.source = null;
     }
     ExpandItem.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (v) {
             this.parent.emit(v);
         },
@@ -404,6 +393,10 @@
                 this.parent.mapper = noop;
                 this.parent.sink.end(err);
             }
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     if (typeof module !== 'undefined') {
@@ -426,18 +419,17 @@
         source._subscribe(this);
     }
     Filter.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
             if (this.cond(value))
                 this.sink.emit(value);
         },
         end: function (err) {
+            this.source = null;
             this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.finally = function (action) {
@@ -452,15 +444,6 @@
         source._subscribe(this);
     }
     Finally.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source) {
-                this.source.close();
-                this.source = null;
-                this.registerProcessEnd(false);
-                this.action();
-            }
-        },
         emit: function (value) {
             this.sink.emit(value);
         },
@@ -468,6 +451,7 @@
             this.source = null;
             this.registerProcessEnd(false);
             this.action();
+            this.action = noop;
             this.sink.end(err);
         },
         registerProcessEnd: function (register) {
@@ -477,67 +461,73 @@
                 process[n]('SIGQUIT', this.action);
                 process[n]('SIGTERM', this.action);
             }
+        },
+        setState: function (state) {
+            if (this.source) {
+                this.source.setState(state);
+                if (state === Asyncplify.states.CLOSED) {
+                    this.source = null;
+                    this.registerProcessEnd(false);
+                    this.action();
+                }
+            }
         }
     };
     Asyncplify.prototype.flatMap = function (options) {
         return new Asyncplify(FlatMap, options, this);
     };
     function FlatMap(options, sink, source) {
-        this.isSubscribing = false;
-        this.mapper = options.mapper || options || identity;
+        this.isPaused = false;
+        this.items = [];
+        this.mapper = options.mapper || options;
         this.maxConcurrency = Math.max(options.maxConcurrency || 0, 0);
         this.sink = sink;
         this.sink.source = this;
+        this.state = Asyncplify.states.RUNNING;
         this.source = null;
-        this.sources = [];
-        this.subscriptions = [];
         source._subscribe(this);
     }
     FlatMap.prototype = {
         childEnd: function (err, item) {
-            removeItem(this.subscriptions, item);
-            this.subscribe(err);
-        },
-        close: function () {
-            if (this.source)
-                this.source.close();
-            for (var i = 0; i < this.subscriptions.length; i++)
-                this.subscriptions[i].close();
-            this.mapper = noop;
-            this.sink = NoopSink.instance;
-            this.source = null;
-            this.sources.length = 0;
-            this.subscriptions.length = 0;
+            var count = this.items.length;
+            removeItem(this.items, item);
+            if (err) {
+                this.setState(Asyncplify.states.CLOSED);
+                this.sink.end(err);
+            } else if (!this.items.length && !this.source) {
+                this.sink.end(null);
+            } else if (this.source && this.maxConcurrency && count === this.maxConcurrency && this.isPaused) {
+                this.isPaused = false;
+                if (this.state === Asyncplify.states.RUNNING)
+                    this.source.setState(Asyncplify.states.RUNNING);
+            }
         },
         emit: function (v) {
             var item = this.mapper(v);
             if (item) {
-                this.sources.push(item);
-                this.subscribe(null);
+                var flatMapItem = new FlatMapItem(this);
+                this.items.push(flatMapItem);
+                if (this.maxConcurrency && this.items.length >= this.maxConcurrency && !this.isPaused) {
+                    this.isPaused = true;
+                    this.source.setState(Asyncplify.states.PAUSED);
+                }
+                item._subscribe(flatMapItem);
             }
         },
         end: function (err) {
             this.source = null;
-            this.subscribe(err);
+            if (err)
+                this.setState(Asyncplify.states.CLOSED);
+            if (err || !this.items.length)
+                this.sink.end(err);
         },
-        subscribe: function (err) {
-            var sink = this.sink;
-            if (err) {
-                this.close();
-                sink.end(err);
-            } else if (!this.isSubscribing) {
-                this.isSubscribing = true;
-                while (this.sources.length && (this.maxConcurrency < 1 || (this.source ? 1 : 0) + this.subscriptions.length < this.maxConcurrency)) {
-                    var item = new FlatMapItem(this);
-                    this.subscriptions.push(item);
-                    this.sources.shift()._subscribe(item);
-                }
-                this.isSubscribing = false;
-                if (!this.sources.length && !this.subscriptions.length && !this.source) {
-                    this.mapper = noop;
-                    this.sink = NoopSink.instance;
-                    sink.end(null);
-                }
+        setState: function (state) {
+            if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
+                this.state = state;
+                if (this.source && !this.isPaused)
+                    this.source.setState(state);
+                for (var i = 0; i < this.items.length && this.state === state; i++)
+                    this.items[i].setState(state);
             }
         }
     };
@@ -546,16 +536,15 @@
         this.source = null;
     }
     FlatMapItem.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (v) {
             this.parent.sink.emit(v);
         },
         end: function (err) {
             this.parent.childEnd(err, this);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.flatMapLatest = function (options) {
@@ -573,25 +562,18 @@
         childEnd: function (err, item) {
             this.subscription = null;
             if (err && this.source) {
-                this.source.close();
+                this.source.setState(Asyncplify.states.CLOSED);
                 this.source = null;
                 this.mapper = noop;
             }
             if (err || !this.source)
                 this.sink.end(err);
         },
-        close: function () {
-            if (this.source)
-                this.source.close();
-            if (this.subscription)
-                this.subscription.close();
-            this.source = this.subscription = null;
-        },
         emit: function (v) {
             var item = this.mapper(v);
             if (item) {
                 if (this.subscription)
-                    this.subscription.close();
+                    this.subscription.setState(Asyncplify.states.CLOSED);
                 this.subscription = new FlatMapItem(this);
                 item._subscribe(this.subscription);
             }
@@ -600,26 +582,50 @@
             this.mapper = noop;
             this.source = null;
             if (err && this.subscription) {
-                this.subscription.close();
+                this.subscription.setState(Asyncplify.states.CLOSED);
                 this.subscription = null;
             }
             if (err || !this.subscription)
                 this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
+            if (this.subscription)
+                this.subscription.setState(state);
         }
     };
     Asyncplify.fromArray = function (array) {
         return new Asyncplify(FromArray, array);
     };
     function FromArray(array, sink) {
+        this.array = array;
+        this.i = 0;
+        this.isProcessing = false;
         this.sink = sink;
         this.sink.source = this;
-        for (var i = 0; i < array.length && this.sink; i++)
-            this.sink.emit(array[i]);
-        if (this.sink)
-            this.sink.end(null);
+        this.state = Asyncplify.states.RUNNING;
+        this.emitItems();
     }
-    FromArray.prototype.close = function () {
-        this.sink = null;
+    FromArray.prototype = {
+        emitItems: function () {
+            this.isProcessing = true;
+            while (this.i < this.array.length && this.state === Asyncplify.states.RUNNING)
+                this.sink.emit(this.array[this.i++]);
+            if (this.state === Asyncplify.states.RUNNING) {
+                this.array = [];
+                this.state = Asyncplify.states.CLOSED;
+                this.sink.end(null);
+            }
+            this.isProcessing = false;
+        },
+        setState: function (state) {
+            if (this.state !== Asyncplify.states.CLOSED && this.state !== state) {
+                this.state = state;
+                if (state === Asyncplify.states.RUNNING && !this.isProcessing)
+                    this.emitItems();
+            }
+        }
     };
     Asyncplify.fromNode = function (func) {
         var args = [];
@@ -645,8 +651,9 @@
             this.sink.end(ex);
         }
     }
-    FromNode.prototype.close = function () {
-        this.sink = NoopSink.instance;
+    FromNode.prototype.setState = function (state) {
+        if (state === Asyncplify.states.CLOSED)
+            this.sink = NoopSink.instance;
     };
     Asyncplify.fromPromise = function (promise, cb) {
         return new Asyncplify(FromPromise, promise);
@@ -664,8 +671,9 @@
         }
         promise.then(resolve, rejected);
     }
-    FromPromise.prototype.close = function () {
-        this.sink = NoopSink.instance;
+    FromPromise.prototype.setState = function (state) {
+        if (state === Asyncplify.states.CLOSED)
+            this.sink = NoopSink.instance;
     };
     Asyncplify.fromRx = function (obs) {
         return new Asyncplify(FromRx, obs);
@@ -683,8 +691,9 @@
         }
         this.subscription = obs.subscribe(next, error, completed);
     }
-    FromRx.prototype.close = function () {
-        this.subscription.dispose();
+    FromRx.prototype.setState = function (state) {
+        if (state === Asyncplify.states.CLOSED)
+            this.subscription.dispose();
     };
     Asyncplify.prototype.groupBy = function (options) {
         return new Asyncplify(GroupBy, options, this);
@@ -699,12 +708,6 @@
         source._subscribe(this);
     }
     GroupBy.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (v) {
             var key = this.keySelector(v);
             var group = this.store[key];
@@ -720,6 +723,10 @@
                 this.store[k].end(null);
             }
             this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.ignoreElements = function () {
@@ -732,17 +739,14 @@
         source._subscribe(this);
     }
     IgnoreElements.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: noop,
         end: function (err) {
             this.source = null;
             this.sink.end(err);
-            this.sink = NoopSink.instance;
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.infinite = function () {
@@ -754,8 +758,9 @@
         while (this.sink)
             this.sink.emit();
     }
-    Infinite.prototype.close = function () {
-        this.sink = null;
+    Infinite.prototype.setState = function (state) {
+        if (state === Asyncplify.states.CLOSED)
+            this.sink = null;
     };
     Asyncplify.interval = function (options) {
         return new Asyncplify(Interval, options);
@@ -771,14 +776,10 @@
     Interval.prototype = {
         action: function () {
             this.sink.emit(this.i++);
-            if (this.scheduler)
-                this.scheduler.schedule(this);
+            this.scheduler.schedule(this);
         },
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.scheduler)
-                this.scheduler.close();
-            this.scheduler = null;
+        setState: function (state) {
+            this.scheduler.setState(state);
         }
     };
     Asyncplify.prototype.last = function (cond) {
@@ -794,12 +795,6 @@
         source._subscribe(this);
     }
     Last.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.sink = NoopSink.instance;
-            this.source = null;
-        },
         emit: function (value) {
             if (this.cond(value)) {
                 this.item = value;
@@ -811,6 +806,10 @@
             if (!err && this.hasItem)
                 this.sink.emit(this.item);
             this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.map = function (mapper) {
@@ -824,22 +823,17 @@
         source._subscribe(this);
     }
     Map.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.mapper = noop;
-            this.source = null;
-        },
         emit: function (value) {
             this.sink.emit(this.mapper(value));
         },
         end: function (err) {
             this.mapper = noop;
             this.source = null;
-            var sink = this.sink;
-            this.sink = NoopSink.instance;
-            sink.end(err);
+            this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.merge = function (options) {
@@ -858,10 +852,9 @@
         if (!this.items.length)
             this.sink.end(null);
     }
-    Merge.prototype.close = function () {
-        this.sink = NoopSink.instance;
+    Merge.prototype.setState = function (state) {
         for (var i = 0; i < this.subscriptions.length; i++)
-            this.subscriptions[i].close();
+            this.subscriptions[i].setState(state);
         this.subscriptions.length = 0;
     };
     function MergeItem(item, parent) {
@@ -872,11 +865,6 @@
         item._subscribe(this);
     }
     MergeItem.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (v) {
             this.parent.sink.emit(v);
         },
@@ -887,12 +875,16 @@
                 removeItem(this.parent.subscriptions, this);
                 if (err || this.parent.index >= this.parent.items.length) {
                     var sink = this.parent.sink;
-                    this.parent.close();
+                    this.parent.setState(Asyncplify.states.CLOSED);
                     sink.end(err);
                 } else if (this.parent.maxConcurrency < 1 || this.parent.concurrency < this.parent.maxConcurrency) {
                     new MergeItem(this.parent.items[this.parent.index++], this.parent);
                 }
             }
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.never = function () {
@@ -901,7 +893,7 @@
     function Never(_, sink) {
         sink.source = this;
     }
-    Never.prototype.close = noop;
+    Never.prototype.setState = noop;
     Asyncplify.prototype.observeOn = function (options) {
         return new Asyncplify(ObserveOn, options, this);
     };
@@ -913,19 +905,17 @@
         source._subscribe(this);
     }
     ObserveOn.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            if (this.scheduler)
-                this.scheduler.close();
-            this.source = null;
-        },
         emit: function (v) {
             this.scheduler.schedule(new ObserveOnItem(v, true, this));
         },
         end: function (err) {
             this.scheduler.schedule(new ObserveOnItem(err, false, this));
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
+            if (this.scheduler)
+                this.scheduler.setState(state);
         }
     };
     function ObserveOnItem(value, isEmit, parent) {
@@ -938,9 +928,8 @@
             this.isEmit ? this.parent.sink.emit(this.value) : this.parent.sink.end(this.value);
         },
         error: function (err) {
-            var sink = this.parent.sink;
-            this.parent.close();
-            sink.end(err);
+            this.parent.sink.end(err);
+            this.parent.setState(Asyncplify.states.CLOSED);
         },
         delay: 0
     };
@@ -951,18 +940,33 @@
         return new Asyncplify(RangeOp, options);
     };
     function RangeOp(options, sink) {
-        var i = options && options.start || 0;
-        var end = typeof options === 'number' ? options : options && options.end || 0;
-        var step = options && options.step || 1;
+        this.end = typeof options === 'number' ? options : options && options.end || 0;
+        this.i = options && options.start || 0;
         this.sink = sink;
         this.sink.source = this;
-        for (; i < end && this.sink; i += step)
-            this.sink.emit(i);
-        if (this.sink)
-            this.sink.end(null);
+        this.state = Asyncplify.states.RUNNING;
+        this.step = options && options.step || 1;
+        this.emitValues();
     }
-    RangeOp.prototype.close = function () {
-        this.sink = null;
+    RangeOp.prototype = {
+        emitValues: function () {
+            while (this.i < this.end && this.state === Asyncplify.states.RUNNING) {
+                var j = this.i;
+                this.i += this.step;
+                this.sink.emit(j);
+            }
+            if (this.state === Asyncplify.states.RUNNING) {
+                this.state = Asyncplify.states.CLOSED;
+                this.sink.end(null);
+            }
+        },
+        setState: function (state) {
+            if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
+                this.state = state;
+                if (state === Asyncplify.states.RUNNING)
+                    this.emitValues();
+            }
+        }
     };
     /*Flow.prototype.recurse = function (options) {
     var produce = options.produce;
@@ -1041,20 +1045,18 @@
         source._subscribe(this);
     }
     Scan.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
             this.acc = this.mapper(this.acc, value);
             this.sink.emit(this.acc);
         },
         end: function (err) {
-            this.mapper = null;
+            this.mapper = noop;
             this.source = null;
             this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.share = function (options) {
@@ -1076,9 +1078,9 @@
             array[i].end(err);
     }
     function Share(_, sink, source, parent) {
+        this.parent = parent;
         this.sink = sink;
         this.sink.source = this;
-        this.parent = parent;
         parent._refs.push(this);
         var self = this;
         if (parent._refs.length === 1) {
@@ -1093,24 +1095,29 @@
         }
     }
     Share.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            removeItem(this.parent._refs, this);
-            if (!this.parent._refs.length) {
-                this.parent._scheduler.close();
-                if (this.parent.source)
-                    this.parent.source.close();
-                this.parent.source = null;
-            }
-        },
         emit: function (value) {
             this.sink.emit(value);
         },
         end: function (err) {
             this.parent.source = null;
-            var sink = this.sink;
-            this.sink = NoopSink.instance;
-            sink.end(err);
+            this.parent = null;
+            this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.parent) {
+                if (state === Asyncplify.states.CLOSED) {
+                    removeItem(this.parent._refs, this);
+                    if (!this.parent._refs.length) {
+                        this.parent._scheduler.setState(state);
+                        if (this.parent.source)
+                            this.parent.source.setState(state);
+                        this.parent.source = null;
+                    }
+                    this.parent = null;
+                } else if (this.parent.source) {
+                    this.parent.source.setState(state);
+                }
+            }
         }
     };
     Asyncplify.prototype.skip = function (count) {
@@ -1124,24 +1131,19 @@
         source._subscribe(this);
     }
     Skip.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
-            if (this.count > 0) {
+            if (this.count > 0)
                 this.count--;
-            } else {
+            else
                 this.sink.emit(value);
-            }
         },
         end: function (err) {
             this.source = null;
-            var sink = this.sink;
-            this.sink = NoopSink.instance;
-            sink.end(err);
+            this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.skipLast = function (count) {
@@ -1156,24 +1158,18 @@
         source._subscribe(this);
     }
     SkipLast.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.items.length = 0;
-            this.source = null;
-        },
         emit: function (value) {
-            this.source = null;
             this.items.push(value);
             this.items.length > this.count && this.sink.emit(this.items.splice(0, 1)[0]);
         },
         end: function (err) {
             this.source = null;
             this.items.length = 0;
-            var sink = this.sink;
-            this.sink = NoopSink.instance;
-            sink.end(err);
+            this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.skipUntil = function (trigger) {
@@ -1189,28 +1185,24 @@
         source._subscribe(this);
     }
     SkipUntil.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.trigger)
-                this.trigger.close();
-            if (this.source)
-                this.source.close();
-            this.trigger = this.source = null;
-        },
         emit: function (value) {
             if (this.can)
                 this.sink.emit(value);
         },
         end: function (err) {
             if (this.trigger)
-                this.trigger.close();
+                this.trigger.setState(Asyncplify.states.CLOSED);
             this.trigger = this.source = null;
-            var sink = this.sink;
-            this.sink = null;
-            sink.end(err);
+            this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.trigger)
+                this.trigger.setState(state);
+            if (this.source)
+                this.source.setState(state);
         },
         triggerEmit: function () {
-            this.trigger.close();
+            this.trigger.setState(Asyncplify.states.CLOSED);
             this.trigger = null;
             this.can = true;
         }
@@ -1227,13 +1219,6 @@
         source._subscribe(this);
     }
     SkipWhile.prototype = {
-        close: function () {
-            this.cond = condTrue;
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
             if (this.can || !this.cond(value)) {
                 this.can = true;
@@ -1243,9 +1228,11 @@
         end: function (err) {
             this.cond = condTrue;
             this.source = null;
-            var sink = this.sink;
-            this.sink = NoopSink.instance;
-            sink.end(err);
+            this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.subject = function () {
@@ -1273,19 +1260,18 @@
         parent.subjects.push(this);
     }
     Subject.prototype = {
-        close: function () {
-            if (this.parent)
-                removeItem(this.parent.subjects, this);
-            this.parent = null;
-        },
         emit: function (value) {
             this.sink.emit(value);
         },
         end: function (err) {
             this.parent = null;
-            var sink = this.sink;
-            this.sink = NoopSink.instance;
-            sink.end(err);
+            this.sink.end(err);
+        },
+        setState: function (state) {
+            if (state === Asyncplify.states.CLOSED && this.parent) {
+                removeItem(this.parent.subjects, this);
+                this.parent = null;
+            }
         }
     };
     Asyncplify.prototype.subscribe = function (options) {
@@ -1303,10 +1289,13 @@
     }
     Subscribe.prototype = {
         close: function () {
-            if (this.source) {
-                this.source.close();
-                this.source = null;
-            }
+            this.source.setState(Asyncplify.states.CLOSED);
+        },
+        pause: function () {
+            this.source.setState(Asyncplify.states.PAUSED);
+        },
+        resume: function () {
+            this.source.setState(Asyncplify.states.RUNNING);
         },
         emit: noop,
         end: noop
@@ -1324,17 +1313,10 @@
     }
     SubscribeOn.prototype = {
         action: function () {
-            this.scheduler.close();
+            this.scheduler.setState(Asyncplify.states.CLOSED);
             this.scheduler = null;
             this.origin._subscribe(this);
             this.origin = null;
-        },
-        close: function () {
-            if (this.scheduler)
-                this.scheduler.close();
-            if (this.source)
-                this.source.close();
-            this.scheduler = this.source = this.origin = null;
         },
         emit: function (value) {
             this.sink.emit(value);
@@ -1344,10 +1326,18 @@
             this.sink.end(err);
         },
         error: function (err) {
-            this.scheduler.close();
-            this.source.close();
+            if (this.scheduler)
+                this.scheduler.setState(Asyncplify.states.CLOSED);
+            if (this.source)
+                this.source.setState(Asyncplify.states.CLOSED);
             this.scheduler = this.source = this.origin = null;
             this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.scheduler)
+                this.scheduler.setState(state);
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.sum = function (mapper, source, cb) {
@@ -1363,11 +1353,6 @@
         source._subscribe(this);
     }
     Sum.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.source = this.sink = this.mapper = null;
-        },
         emit: function (value) {
             this.value += this.mapper(value) || 0;
             this.hasValue = true;
@@ -1376,8 +1361,11 @@
             this.source = null;
             if (!err && this.hasValue && this.sink)
                 this.sink.emit(this.value);
-            if (this.sink)
-                this.sink.end(err);
+            this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.take = function (count) {
@@ -1391,17 +1379,11 @@
         source._subscribe(this);
     }
     Take.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.sink = NoopSink.instance;
-            this.source = null;
-        },
         emit: function (value) {
             if (this.count--) {
                 this.sink.emit(value);
                 if (!this.count) {
-                    this.source.close();
+                    this.source.setState(Asyncplify.states.CLOSED);
                     this.source = null;
                     this.sink.end(null);
                 }
@@ -1410,6 +1392,10 @@
         end: function (err) {
             this.source = null;
             this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.takeUntil = function (trigger) {
@@ -1425,33 +1411,27 @@
             source._subscribe(this);
     }
     TakeUntil.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            if (this.trigger)
-                this.trigger.close();
-            this.source = this.trigger = null;
-        },
         emit: function (value) {
             this.sink.emit(value);
         },
         end: function (err) {
             if (this.trigger)
-                this.trigger.close();
+                this.trigger.setState(Asyncplify.states.CLOSED);
             this.source = this.trigger = null;
-            var sink = this.sink;
-            this.sink = NoopSink.instance;
-            sink.end(err);
+            this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
+            if (this.trigger)
+                this.trigger.setState(state);
         },
         triggerEmit: function () {
             if (this.source)
-                this.source.close();
-            this.trigger.close();
+                this.source.setState(Asyncplify.states.CLOSED);
+            this.trigger.setState(Asyncplify.states.CLOSED);
             this.source = this.trigger = null;
-            var sink = this.sink;
-            this.sink = NoopSink.instance;
-            sink.end(null);
+            this.sink.end(null);
         }
     };
     Asyncplify.prototype.takeWhile = function (cond) {
@@ -1465,18 +1445,11 @@
         source._subscribe(this);
     }
     TakeWhile.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.cond = noop;
-            this.source = null;
-            this.sink = NoopSink.instance;
-        },
         emit: function (value) {
             if (this.cond(value)) {
                 this.sink.emit(value);
             } else {
-                this.source.close();
+                this.source.setState(Asyncplify.states.CLOSED);
                 this.source = null;
                 this.cond = noop;
                 this.sink.end(null);
@@ -1486,6 +1459,10 @@
             this.source = null;
             this.cond = noop;
             this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.prototype.tap = function (options) {
@@ -1494,6 +1471,7 @@
     function Tap(options, sink, source) {
         this._emit = options && options.emit || typeof options === 'function' && options || noop;
         this._end = options && options.end || noop;
+        this._setState = options && options.setState || noop;
         this.sink = sink;
         this.sink.source = this;
         this.source = null;
@@ -1505,12 +1483,6 @@
         source._subscribe(this);
     }
     Tap.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
             this._emit(value);
             this.sink.emit(value);
@@ -1519,6 +1491,11 @@
             this.source = null;
             this._end(err);
             this.sink.end(err);
+        },
+        setState: function (state) {
+            this._setState(state);
+            if (this.source)
+                this.source.setState(state);
         }
     };
     Asyncplify.throw = function (err, cb) {
@@ -1526,8 +1503,9 @@
     };
     function Throw(err, sink) {
         sink.end(err);
+        sink.source = this;
     }
-    Throw.prototype.close = noop;
+    Throw.prototype.setState = noop;
     Asyncplify.prototype.timeout = function (options) {
         return new Asyncplify(Timeout, options, this);
     };
@@ -1547,40 +1525,37 @@
     }
     Timeout.prototype = {
         action: function () {
-            this.scheduler.close();
+            this.scheduler.setState(Asyncplify.states.CLOSED);
             this.subscribable = this.scheduler = null;
             if (this.source)
-                this.source.close();
+                this.source.setState(Asyncplify.states.CLOSED);
             this.other._subscribe(this);
-        },
-        close: function () {
-            if (this.source)
-                this.source.close();
-            if (this.scheduler)
-                this.scheduler.close();
-            this.scheduler = this.source = null;
-            this.sink = NoopSink.instance;
         },
         emit: function (value) {
             if (this.scheduler)
-                this.scheduler.close();
+                this.scheduler.setState(Asyncplify.states.CLOSED);
             this.scheduler = null;
             this.sink.emit(value);
         },
         end: function (err) {
             if (this.scheduler)
-                this.scheduler.close();
+                this.scheduler.setState(Asyncplify.states.CLOSED);
             this.source = this.scheduler = null;
             this.sink.end(err);
-            this.sink = NoopSink.instance;
         },
         error: function (err) {
-            this.scheduler.close();
+            if (this.scheduler)
+                this.scheduler.setState(Asyncplify.states.CLOSED);
             if (this.source)
-                this.source.close();
+                this.source.setState(Asyncplify.states.CLOSED);
             this.source = this.scheduler = null;
             this.sink.end(err);
-            this.sink = NoopSink.instance;
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
+            if (this.scheduler)
+                this.scheduler.setState(state);
         }
     };
     Asyncplify.prototype.toArray = function (options, source, cb) {
@@ -1622,12 +1597,6 @@
         this.splitLength && this.array.length >= this.splitLength && this.emitArray();
     }
     ToArray.prototype = {
-        close: function () {
-            this.sink = NoopSink.instance;
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (value) {
             this.array.push(value);
         },
@@ -1642,9 +1611,15 @@
             if (!err && (this.array.length || !this.hasEmit && this.emitEmpty))
                 this.sink.emit(this.array);
             if (this.trigger)
-                this.trigger.close();
+                this.trigger.setState(Asyncplify.states.CLOSED);
             this.trigger = null;
             this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
+            if (this.trigger)
+                this.trigger.setState(state);
         },
         triggerEmit: function () {
             if (this.array.length || this.emitEmpty)
@@ -1664,13 +1639,6 @@
         source._subscribe(this);
     }
     Transduce.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.acc = null;
-            this.source = null;
-            this.transformer = null;
-        },
         '@@transducer/init': function (acc) {
             this.acc = acc;
         },
@@ -1687,6 +1655,10 @@
         },
         end: function (err) {
             err ? this.transformer['@@transducer/result'](this.acc) : this.sink.end(err);
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     function Trigger(source, target) {
@@ -1696,16 +1668,14 @@
         source._subscribe(this);
     }
     Trigger.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.source = this.target = null;
-        },
         emit: function (value) {
-            if (this.target)
-                this.target.triggerEmit(value);
+            this.target.triggerEmit(value);
         },
-        end: noop
+        end: noop,
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
+        }
     };
     function condTrue() {
         return true;
@@ -1743,8 +1713,9 @@
         this.sink.emit(value);
         this.sink.end(null);
     }
-    Value.prototype.close = function () {
-        this.sink = NoopSink.instance;
+    Value.prototype.setState = function (state) {
+        if (state === Asyncplify.states.CLOSED)
+            this.sink = NoopSink.instance;
     };
     Asyncplify.zip = function (options) {
         return new Asyncplify(Zip, options);
@@ -1763,17 +1734,9 @@
         if (!items.length)
             this.sink.end(null);
     }
-    Zip.prototype = {
-        close: function () {
-            this.sink = null;
-            this.closeSubscriptions();
-        },
-        closeSubscriptions: function () {
-            for (var i = 0; i < this.subscriptions.length; i++)
-                this.subscriptions[i].close();
-            this.mapper = null;
-            this.subscriptions.length = 0;
-        }
+    Zip.prototype.setState = function (state) {
+        for (var i = 0; i < this.subscriptions.length; i++)
+            this.subscriptions[i].setState(Asyncplify.states.CLOSED);
     };
     function ZipItem(source, parent) {
         this.items = [];
@@ -1783,11 +1746,6 @@
         source._subscribe(this);
     }
     ZipItem.prototype = {
-        close: function () {
-            if (this.source)
-                this.source.close();
-            this.source = null;
-        },
         emit: function (v) {
             this.items.push(v);
             if (this.items.length === 1 && !this.parent.subscribables && this.parent.sink) {
@@ -1805,7 +1763,7 @@
                     s = subscriptions[i];
                     if (!s.source && !s.items.length) {
                         this.parent.mapper = noop;
-                        this.parent.closeSubscriptions();
+                        this.parent.setState(Asyncplify.states.CLOSED);
                         this.parent.sink.end(null);
                         this.parent.sink = NoopSink.instance;
                         break;
@@ -1820,6 +1778,10 @@
                 this.parent.sink.end(err);
                 this.parent.sink = NoopSink.instance;
             }
+        },
+        setState: function (state) {
+            if (this.source)
+                this.source.setState(state);
         }
     };
     function AbsoluteTimeoutItem(context, item, dueTime) {
@@ -1835,7 +1797,7 @@
         },
         schedule: function () {
             var self = this;
-            this.handle = setTimeout(function () {
+            this.handle = setTimeout(function handleAbsoluteTimeout() {
                 self.execute();
             }, Math.max(this.dueTime - Date.now(), 0));
         }
@@ -1852,7 +1814,7 @@
         },
         schedule: function () {
             var self = this;
-            this.handle = setImmediate(function () {
+            this.handle = setImmediate(function handleImmediate() {
                 self.execute();
             });
         }
@@ -1867,10 +1829,13 @@
     RelativeTimeoutItem.prototype = {
         close: function () {
             clearTimeout(this.handle);
+            this.handle = null;
+            this.delay = Math.max(this.delay - (Date.now() - this.scheduleTime));
         },
         schedule: function () {
             var self = this;
-            this.handle = setTimeout(function () {
+            this.scheduleTime = Date.now();
+            this.handle = setTimeout(function handleRelativeTimeout() {
                 self.execute();
             }, this.delay);
         }
@@ -1878,27 +1843,36 @@
     function ScheduleContext(factory) {
         this.factory = factory;
         this.items = [];
+        this.state = Asyncplify.states.RUNNING;
     }
     ScheduleContext.prototype = {
-        close: function (item) {
-            var i;
-            if (item) {
-                for (i = 0; i < this.items.length; i++)
-                    if (this.items[i].item === item) {
-                        this.items[i].close();
-                        this.items.splice(i);
-                        return;
-                    }
-            } else {
-                for (i = 0; i < this.items.length; i++)
-                    this.items[i].close();
-                this.items.length = 0;
-            }
+        reset: function () {
+            for (var i = 0; i < this.items.length; i++)
+                this.items[i].close();
+            this.items.length = 0;
         },
         schedule: function (item) {
-            var scheduleItem = this.factory(item);
-            this.items.push(scheduleItem);
-            scheduleItem.schedule();
+            if (this.state !== Asyncplify.states.CLOSED) {
+                var scheduleItem = this.factory(item);
+                this.items.push(scheduleItem);
+                if (this.state === Asyncplify.states.RUNNING)
+                    scheduleItem.schedule();
+            }
+        },
+        setState: function (state) {
+            var i;
+            if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
+                this.state = state;
+                if (state === Asyncplify.states.RUNNING) {
+                    for (i = 0; i < this.items.length; i++)
+                        this.items[i].schedule();
+                } else {
+                    for (i = 0; i < this.items.length; i++)
+                        this.items[i].close();
+                    if (state === Asyncplify.states.CLOSED)
+                        this.items.length = 0;
+                }
+            }
         }
     };
     function schedulerExecuteSafe() {

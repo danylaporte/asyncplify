@@ -17,16 +17,16 @@ function shareEnd(err) {
     this._refs = [];
 
     for (var i = 0; i < array.length; i++)
-         array[i].end(err);
+        array[i].end(err);
 }
 
 function Share(_, sink, source, parent) {
+    this.parent = parent;
     this.sink = sink;
     this.sink.source = this;
-    this.parent = parent;
 
     parent._refs.push(this);
-    
+
     var self = this;
 
     if (parent._refs.length === 1) {
@@ -42,24 +42,29 @@ function Share(_, sink, source, parent) {
 }
 
 Share.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        
-        removeItem(this.parent._refs, this);
-        
-        if (!this.parent._refs.length) {
-            this.parent._scheduler.close();
-            if (this.parent.source) this.parent.source.close();
-            this.parent.source = null;
-        }
-    },
     emit: function (value) {
         this.sink.emit(value);
     },
     end: function (err) {
         this.parent.source = null;
-        var sink = this.sink;
-        this.sink = NoopSink.instance;
-        sink.end(err);
+        this.parent = null;
+        this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.parent) {
+            if (state === Asyncplify.states.CLOSED) {
+                removeItem(this.parent._refs, this);
+
+                if (!this.parent._refs.length) {
+                    this.parent._scheduler.setState(state);
+                    if (this.parent.source) this.parent.source.setState(state);
+                    this.parent.source = null;
+                }
+
+                this.parent = null;
+            } else if (this.parent.source) {
+                this.parent.source.setState(state);
+            }
+        }
     }
 };

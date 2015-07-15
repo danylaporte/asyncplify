@@ -17,10 +17,13 @@ function Subscribe(options, source) {
 
 Subscribe.prototype = {
     close: function () {
-        if (this.source) {
-            this.source.close();
-            this.source = null;
-        }
+        this.source.setState(Asyncplify.states.CLOSED);
+    },
+    pause: function () {
+        this.source.setState(Asyncplify.states.PAUSED);
+    },
+    resume: function () {
+        this.source.setState(Asyncplify.states.RUNNING);
     },
     emit: noop,
     end: noop

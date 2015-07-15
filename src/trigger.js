@@ -6,13 +6,11 @@ function Trigger(source, target) {
 }
 
 Trigger.prototype = {
-    close: function () {
-        if (this.source) this.source.close();
-        this.source = this.target = null;
-    },
     emit: function (value) {
-        if (this.target)
-            this.target.triggerEmit(value);
+        this.target.triggerEmit(value);
     },
-    end: noop
+    end: noop,
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
+    }
 };

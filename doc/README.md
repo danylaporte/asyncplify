@@ -80,7 +80,7 @@ asyncplify
 ```
 
 ### debounce(options)
-Emit the most recent received item received after delay. 
+Emit the most recent received item received after delay.
 
 options:
 - delay Number default = 0
@@ -166,25 +166,32 @@ asyncplify
 	// 3
 	// 3
 	// end.
-```
+	```
 
-### Closing a subscription
-Every subscription to asyncplify source can be close.
+	### Handle backpressure with Pause, Resume, Close
+	Every subscription to asyncplify source can be paused, resume or close.
 
 
-```js
-var subscription = asyncplify
-    .fromArray([0, 1, 2, 3, 4])
-    .observeOn(asyncplify.schedulers.timeout)
-    .subscribe(function (x) {
-        console.log(x);
-        
-        if (x === 2) 
-            subscription.close();
-    });
+	```js
+	var subscription = asyncplify
+	    .fromArray([0, 1, 2, 3, 4])
+	    .observeOn(asyncplify.schedulers.timeout)
+	    .subscribe(function (x) {
+	        console.log(x);
 
-// 0
-// 1
-// 2
-// (will be closed here so that no more emit/end event will be sent)
-```
+	        if (x === 2)
+	            subscription.pause();
+	    });
+
+	setTimeout(function () {
+	    subscription.resume();
+	}, 1000);
+
+	// 0
+	// 1
+	// 2
+	// (will be paused for 1000 ms)
+	// 3
+	// 4
+	// end.
+	```

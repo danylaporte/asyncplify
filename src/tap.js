@@ -5,6 +5,7 @@ Asyncplify.prototype.tap = function (options) {
 function Tap(options, sink, source) {
     this._emit = options && options.emit || typeof options === 'function' && options || noop;
     this._end = options && options.end || noop;
+    this._setState = options && options.setState || noop;
     this.sink = sink;
     this.sink.source = this;
     this.source = null;
@@ -14,11 +15,6 @@ function Tap(options, sink, source) {
 }
 
 Tap.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (value) {
         this._emit(value);
         this.sink.emit(value);
@@ -27,5 +23,9 @@ Tap.prototype = {
         this.source = null;
         this._end(err);
         this.sink.end(err);
+    },
+    setState: function (state) {
+        this._setState(state);
+        if (this.source) this.source.setState(state);
     }
 };

@@ -7,4 +7,4 @@ function Empty(_, sink) {
     sink.end(null);
 }
 
-Empty.prototype.close = noop;
+Empty.prototype.setState = noop;

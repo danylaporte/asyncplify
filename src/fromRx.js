@@ -12,6 +12,7 @@ function FromRx(obs, sink) {
 	this.subscription = obs.subscribe(next, error, completed);
 }
 
-FromRx.prototype.close = function () {
-	this.subscription.dispose();
+FromRx.prototype.setState = function (state) {
+	if (state === Asyncplify.states.CLOSED)
+		this.subscription.dispose();
 };

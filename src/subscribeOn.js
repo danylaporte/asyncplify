@@ -14,15 +14,10 @@ function SubscribeOn(options, sink, source) {
 
 SubscribeOn.prototype = {
     action: function () {
-        this.scheduler.close();
+        this.scheduler.setState(Asyncplify.states.CLOSED);
         this.scheduler = null;
         this.origin._subscribe(this);
         this.origin = null;
-    },
-    close: function () {
-        if (this.scheduler) this.scheduler.close();
-        if (this.source) this.source.close();
-        this.scheduler = this.source = this.origin = null;
     },
     emit: function (value) {
         this.sink.emit(value);  
@@ -32,9 +27,13 @@ SubscribeOn.prototype = {
         this.sink.end(err);  
     },
     error: function (err) {
-        this.scheduler.close();
-        this.source.close();
+        if (this.scheduler) this.scheduler.setState(Asyncplify.states.CLOSED);
+        if (this.source) this.source.setState(Asyncplify.states.CLOSED);
         this.scheduler = this.source = this.origin = null;
         this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.scheduler) this.scheduler.setState(state);
+        if (this.source) this.source.setState(state);
     }
 };

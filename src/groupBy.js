@@ -14,11 +14,6 @@ function GroupBy(options, sink, source) {
 }
 
 GroupBy.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        this.source = null;  
-    },
     emit: function (v) {
         var key = this.keySelector(v);
         var group = this.store[key];
@@ -37,5 +32,8 @@ GroupBy.prototype = {
         }
 
         this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);  
     }
 };

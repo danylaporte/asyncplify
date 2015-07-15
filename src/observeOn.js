@@ -12,17 +12,15 @@ function ObserveOn(options, sink, source) {
 }
 
 ObserveOn.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        if (this.scheduler) this.scheduler.close();
-        this.source = null;  
-    },
     emit: function (v) {
-        this.scheduler.schedule(new ObserveOnItem(v, true, this));  
+        this.scheduler.schedule(new ObserveOnItem(v, true, this));
     },
     end: function (err) {
         this.scheduler.schedule(new ObserveOnItem(err, false, this));
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
+        if (this.scheduler) this.scheduler.setState(state);
     }
 };
 
@@ -37,9 +35,8 @@ ObserveOnItem.prototype = {
         this.isEmit ? this.parent.sink.emit(this.value) : this.parent.sink.end(this.value);
     },
     error: function (err) {
-        var sink = this.parent.sink;
-        this.parent.close();
-        sink.end(err);
+        this.parent.sink.end(err);
+        this.parent.setState(Asyncplify.states.CLOSED);
     },
     delay: 0
 };

@@ -9,9 +9,13 @@ function RelativeTimeoutItem(context, item, delay) {
 RelativeTimeoutItem.prototype = {
     close: function () {
         clearTimeout(this.handle);
+        this.handle = null;
+        this.delay = Math.max(this.delay - (Date.now() - this.scheduleTime));
     },
     schedule: function () {
         var self = this;
-        this.handle = setTimeout(function () { self.execute(); }, this.delay);
+        this.scheduleTime = Date.now();
+        this.handle = setTimeout(function handleRelativeTimeout() { self.execute(); }, this.delay);
+
     }
 };

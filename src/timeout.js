@@ -20,33 +20,29 @@ function Timeout(options, sink, source) {
 
 Timeout.prototype = {
     action: function () {
-        this.scheduler.close();
+        this.scheduler.setState(Asyncplify.states.CLOSED);
         this.subscribable = this.scheduler = null;
-        if (this.source) this.source.close();
+        if (this.source) this.source.setState(Asyncplify.states.CLOSED);
         this.other._subscribe(this);
     },
-    close: function () {
-        if (this.source) this.source.close();
-        if (this.scheduler) this.scheduler.close();
-        this.scheduler = this.source = null;
-        this.sink = NoopSink.instance;
-    },
     emit: function (value) {
-        if (this.scheduler) this.scheduler.close();
+        if (this.scheduler) this.scheduler.setState(Asyncplify.states.CLOSED);
         this.scheduler = null;
         this.sink.emit(value);
     },
     end: function (err) {
-        if (this.scheduler) this.scheduler.close();
+        if (this.scheduler) this.scheduler.setState(Asyncplify.states.CLOSED);
         this.source = this.scheduler = null;        
         this.sink.end(err);
-        this.sink = NoopSink.instance;
     },
     error: function (err) {
-        this.scheduler.close();
-        if (this.source) this.source.close();
+        if (this.scheduler) this.scheduler.setState(Asyncplify.states.CLOSED);
+        if (this.source) this.source.setState(Asyncplify.states.CLOSED);
         this.source = this.scheduler = null;
         this.sink.end(err);
-        this.sink = NoopSink.instance;
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
+        if (this.scheduler) this.scheduler.setState(state);
     }
 };

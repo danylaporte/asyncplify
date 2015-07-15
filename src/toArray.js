@@ -45,11 +45,6 @@ function toArraySplitLength(v) {
 }
 
 ToArray.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (value) {
         this.array.push(value);
     },
@@ -65,9 +60,13 @@ ToArray.prototype = {
         if (!err && (this.array.length || (!this.hasEmit && this.emitEmpty)))
             this.sink.emit(this.array);
 
-        if (this.trigger) this.trigger.close();
+        if (this.trigger) this.trigger.setState(Asyncplify.states.CLOSED);
         this.trigger = null;
         this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
+        if (this.trigger) this.trigger.setState(state);
     },
     triggerEmit: function () {
         if (this.array.length || this.emitEmpty) this.emitArray();

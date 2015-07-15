@@ -6,4 +6,4 @@ function Never(_, sink) {
     sink.source = this;
 }
 
-Never.prototype.close = noop;
+Never.prototype.setState = noop;

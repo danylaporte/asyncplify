@@ -9,6 +9,7 @@ function Value(value, sink) {
     this.sink.end(null);
 }
 
-Value.prototype.close = function () {
-    this.sink = NoopSink.instance;
+Value.prototype.setState = function (state) {
+    if (state === Asyncplify.states.CLOSED)
+        this.sink = NoopSink.instance;
 };

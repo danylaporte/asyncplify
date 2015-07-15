@@ -19,18 +19,9 @@ function Zip(options, sink) {
     if (!items.length) this.sink.end(null);
 }
 
-Zip.prototype = {
-    close: function () {
-        this.sink = null;
-        this.closeSubscriptions();
-    },
-    closeSubscriptions: function () {
-        for (var i = 0; i < this.subscriptions.length; i++)
-            this.subscriptions[i].close();
-
-        this.mapper = null;
-        this.subscriptions.length = 0;
-    }
+Zip.prototype.setState = function (state) {
+    for (var i = 0; i < this.subscriptions.length; i++)
+        this.subscriptions[i].setState(Asyncplify.states.CLOSED);
 };
 
 function ZipItem(source, parent) {
@@ -43,10 +34,6 @@ function ZipItem(source, parent) {
 }
 
 ZipItem.prototype = {
-    close: function () {
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (v) {
         this.items.push(v);
 
@@ -68,7 +55,7 @@ ZipItem.prototype = {
                 
                 if (!s.source && !s.items.length) {
                     this.parent.mapper = noop;
-                    this.parent.closeSubscriptions();
+                    this.parent.setState(Asyncplify.states.CLOSED);
                     this.parent.sink.end(null);
                     this.parent.sink = NoopSink.instance;
                     break;
@@ -84,5 +71,8 @@ ZipItem.prototype = {
             this.parent.sink.end(err);
             this.parent.sink = NoopSink.instance;
         }
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

@@ -12,17 +12,12 @@ function Take(count, sink, source) {
 }
 
 Take.prototype = {
-    close: function () {
-        if (this.source) this.source.close();
-        this.sink = NoopSink.instance;
-        this.source = null;
-    },
     emit: function (value) {
         if (this.count--) {
             this.sink.emit(value);
             
             if (!this.count) {
-                this.source.close();
+                this.source.setState(Asyncplify.states.CLOSED);
                 this.source = null;
                 this.sink.end(null);
             }
@@ -31,5 +26,8 @@ Take.prototype = {
     end: function (err) {
         this.source = null;
         this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

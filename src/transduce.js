@@ -14,12 +14,6 @@ function Transduce(transformer, sink, source) {
 }
 
 Transduce.prototype = {
-    close: function () {
-        if (this.source) this.source.close();
-        this.acc = null;
-        this.source = null;
-        this.transformer = null;
-    },
 	'@@transducer/init': function (acc) {
 		this.acc = acc;
 	},
@@ -36,5 +30,8 @@ Transduce.prototype = {
     },
     end: function (err) {
 		err ? this.transformer["@@transducer/result"](this.acc) : this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

@@ -3,15 +3,35 @@ Asyncplify.fromArray = function (array) {
 };
 
 function FromArray(array, sink) {
+    this.array = array;
+    this.i = 0;
+    this.isProcessing = false;
     this.sink = sink;
     this.sink.source = this;
+    this.state = Asyncplify.states.RUNNING;
     
-    for (var i = 0; i < array.length && this.sink; i++)
-        this.sink.emit(array[i]);
-        
-    if (this.sink) this.sink.end(null);
+    this.emitItems();
 }
 
-FromArray.prototype.close = function () {
-    this.sink = null;
+FromArray.prototype = {
+    emitItems: function () {
+        this.isProcessing = true;
+        
+        while (this.i < this.array.length && this.state === Asyncplify.states.RUNNING)
+            this.sink.emit(this.array[this.i++]);
+            
+        if (this.state === Asyncplify.states.RUNNING) {
+            this.array = [];
+            this.state = Asyncplify.states.CLOSED;
+            this.sink.end(null);
+        }
+        
+        this.isProcessing = false;
+    },
+    setState: function (state) {
+        if (this.state !== Asyncplify.states.CLOSED && this.state !== state) {
+            this.state = state;
+            if (state === Asyncplify.states.RUNNING && !this.isProcessing) this.emitItems();
+        }
+    }
 };

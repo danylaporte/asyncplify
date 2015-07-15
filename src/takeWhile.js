@@ -12,17 +12,11 @@ function TakeWhile(cond, sink, source) {
 }
 
 TakeWhile.prototype = {
-    close: function () {
-        if (this.source) this.source.close();
-        this.cond = noop;
-        this.source = null;
-        this.sink = NoopSink.instance;
-    },
     emit: function (value) {
         if (this.cond(value)) {
             this.sink.emit(value);
         } else {
-            this.source.close();
+            this.source.setState(Asyncplify.states.CLOSED);
             this.source = null;
             this.cond = noop;
             this.sink.end(null);
@@ -32,5 +26,8 @@ TakeWhile.prototype = {
         this.source = null;
         this.cond = noop;
         this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

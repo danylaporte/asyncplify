@@ -17,22 +17,17 @@ FlatMapLatest.prototype = {
         this.subscription = null;
 
         if (err && this.source) {
-            this.source.close();
+            this.source.setState(Asyncplify.states.CLOSED);
             this.source = null;
             this.mapper = noop;
         }
 
         if (err || !this.source) this.sink.end(err);
     },
-    close: function () {
-        if (this.source) this.source.close();
-        if (this.subscription) this.subscription.close();
-        this.source = this.subscription = null;
-    },
     emit: function (v) {
         var item = this.mapper(v);
         if (item) {
-            if (this.subscription) this.subscription.close();
+            if (this.subscription) this.subscription.setState(Asyncplify.states.CLOSED);
             this.subscription = new FlatMapItem(this);
             item._subscribe(this.subscription);
         }
@@ -42,10 +37,14 @@ FlatMapLatest.prototype = {
         this.source = null;
 
         if (err && this.subscription) {
-            this.subscription.close();
+            this.subscription.setState(Asyncplify.states.CLOSED);
             this.subscription = null;
         }
 
         if (err || !this.subscription) this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
+        if (this.subscription) this.subscription.setState(state);
     }
 };

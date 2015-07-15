@@ -18,12 +18,6 @@ function Catch(options, sink, source) {
 }
         
 Catch.prototype = {
-    close: function () {
-        this.mapper = noop;
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (value) {
         this.sink.emit(value);
     },
@@ -37,10 +31,13 @@ Catch.prototype = {
                 return source._subscribe(this);
         }
         
+        this.mapper = null;
         this.sink.end(err);
-        this.sink = NoopSink.instance;
     },
     mapper: function() {
         return this.i < this.sources.length && this.sources[this.i++];
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

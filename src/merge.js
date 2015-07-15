@@ -17,11 +17,9 @@ function Merge(options, sink) {
     if (!this.items.length) this.sink.end(null);
 }
 
-Merge.prototype.close = function () {
-    this.sink = NoopSink.instance;
-    
+Merge.prototype.setState = function (state) {
     for (var i = 0; i < this.subscriptions.length; i++)
-        this.subscriptions[i].close();
+        this.subscriptions[i].setState(state);
 
     this.subscriptions.length = 0;
 };
@@ -36,10 +34,6 @@ function MergeItem(item, parent) {
 }
 
 MergeItem.prototype = {
-    close: function () {
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (v) {
         this.parent.sink.emit(v);
     },
@@ -51,11 +45,14 @@ MergeItem.prototype = {
 
             if (err || this.parent.index >= this.parent.items.length) {
                 var sink = this.parent.sink;
-                this.parent.close();
+                this.parent.setState(Asyncplify.states.CLOSED);
                 sink.end(err);
             } else if (this.parent.maxConcurrency < 1 || this.parent.concurrency < this.parent.maxConcurrency) {
                 new MergeItem(this.parent.items[this.parent.index++], this.parent);
             }
         }
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

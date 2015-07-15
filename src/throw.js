@@ -4,6 +4,7 @@ Asyncplify.throw = function (err, cb) {
 
 function Throw(err, sink) {
     sink.end(err);
+    sink.source = this;
 }
 
-Throw.prototype.close = noop;
+Throw.prototype.setState = noop;

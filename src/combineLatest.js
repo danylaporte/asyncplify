@@ -25,10 +25,9 @@ function CombineLatest(options, sink) {
         this.sink.end(null);
 }
 
-CombineLatest.prototype.close = function () {
-    this.sink = NoopSink.instance;
+CombineLatest.prototype.setState = function (state) {
     for (var i = 0; i < this.subscriptions.length; i++)
-        this.subscriptions[i].close();
+        this.subscriptions[i].setState(state);
     this.subscriptions.length = 0;
 };
 
@@ -42,10 +41,6 @@ function CombineLatestItem(source, parent, index) {
 }
 
 CombineLatestItem.prototype = {
-    close: function () {
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (v) {
         this.parent.values[this.index] = v;
         
@@ -65,7 +60,10 @@ CombineLatestItem.prototype = {
             
         if (err || !this.parent.closableCount) {
             this.parent.sink.end(err);
-            if (err) this.parent.close();
+            if (err) this.parent.setState(Asyncplify.states.CLOSED);
         }
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

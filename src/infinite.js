@@ -5,11 +5,12 @@ Asyncplify.infinite = function () {
 function Infinite(_, sink) {
 	this.sink = sink;
 	this.sink.source = this;
-	
+
 	while (this.sink)
 		this.sink.emit();
 }
 
-Infinite.prototype.close = function () {
-	this.sink = null;	
+Infinite.prototype.setState = function (state) {
+	if (state === Asyncplify.states.CLOSED)
+		this.sink = null;
 };

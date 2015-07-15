@@ -12,22 +12,17 @@ function Skip(count, sink, source) {
 }
 
 Skip.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        this.source = null;  
-    },
     emit: function (value) {
-        if (this.count > 0) {
+        if (this.count > 0)
             this.count--
-        } else {
+        else
             this.sink.emit(value);
-        }
     },
     end: function (err) {
         this.source = null;
-        var sink = this.sink;
-        this.sink = NoopSink.instance;
-        sink.end(err);      
+        this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

@@ -10,7 +10,7 @@ function Debounce(options, sink, source) {
     this.sink.source = this;
     this.source = null;
     this.value = undefined;
-    
+
     source._subscribe(this);
 }
 
@@ -20,39 +20,29 @@ Debounce.prototype = {
         this.itemPending = false;
         this.value = undefined;
         this.sink.emit(v);
-        
+
         if (!this.source) {
-            if (this.scheduler) this.scheduler.close();
-            this.scheduler = null;
+            this.scheduler.setState(Asyncplify.states.CLOSED);
             this.sink.end(null);
-            this.sink = NoopSink.instance;
         }
-    },
-    close: function () {
-        if (this.source) this.source.close();
-        if (this.scheduler) this.scheduler.close();
-        this.source = this.scheduler = this.value = null;
-        this.sink = NoopSink.instance;  
     },
     emit: function (value) {
         this.itemPending = true;
         this.value = value;
-        
-        if (this.scheduler) {
-            this.scheduler.close();
-            this.scheduler.schedule(this);
-        }
+        this.scheduler.reset();
+        this.scheduler.schedule(this);
     },
     end: function (err) {
         this.source = null;
-        debugger;
 
         if (err || !this.itemPending) {
-            if (this.scheduler) this.scheduler.close();
-            this.scheduler = null;
+            this.scheduler.setState(Asyncplify.states.CLOSED);
             this.value = undefined;
             this.sink.end(err);
-            this.sink = NoopSink.instance;
         }
+    },
+    setState: function (state) {
+        this.scheduler.setState(state);
+        if (this.source) this.source.setState(state);
     }
 };

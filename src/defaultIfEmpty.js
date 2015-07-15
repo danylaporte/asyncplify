@@ -8,19 +8,14 @@ function DefaultIfEmpty(value, sink, source) {
     this.sink.source = this;
     this.source = null;
     this.value = value;
-    
+
     source._subscribe(this);
 }
 
 DefaultIfEmpty.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (value) {
         this.hasValue = true;
-        if (this.sink) this.sink.emit(value);
+        this.sink.emit(value);
     },
     end: function (err) {
         this.source = null;
@@ -29,6 +24,8 @@ DefaultIfEmpty.prototype = {
             this.sink.emit(this.value);
 
         this.sink.end(err);
-        this.sink = NoopSink.instance;
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

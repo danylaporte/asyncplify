@@ -18,7 +18,7 @@ describe('interval', function () {
 
                     var delay = Date.now() - start;
                     count.should.equal(1);
-                    delay.should.be.approximately(10, 8);
+                    delay.should.be.approximately(10, 30);
 
                 },
                 end: function (err) {

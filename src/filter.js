@@ -18,16 +18,15 @@ function Filter(cond, sink, source) {
 }
 
 Filter.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (value) {
         if (this.cond(value))
             this.sink.emit(value);
     },
     end: function (err) {
+        this.source = null;
         this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

@@ -3,68 +3,61 @@ Asyncplify.prototype.flatMap = function (options) {
 };
 
 function FlatMap(options, sink, source) {
-    this.isSubscribing = false;
-    this.mapper = options.mapper || options || identity;
+    this.isPaused = false;
+    this.items = [];
+    this.mapper = options.mapper || options;
     this.maxConcurrency = Math.max(options.maxConcurrency || 0, 0);
     this.sink = sink;
     this.sink.source = this;
+    this.state = Asyncplify.states.RUNNING;
     this.source = null;
-    this.sources = [];
-    this.subscriptions = [];
 
     source._subscribe(this);
 }
 
 FlatMap.prototype = {
     childEnd: function (err, item) {
-        removeItem(this.subscriptions, item);
-        this.subscribe(err);
-    },
-    close: function () {
-        if (this.source) this.source.close();
+        var count = this.items.length;
+        removeItem(this.items, item);
 
-        for (var i = 0; i < this.subscriptions.length; i++)
-            this.subscriptions[i].close();
-
-        this.mapper = noop;
-        this.sink = NoopSink.instance;
-        this.source = null;
-        this.sources.length = 0;
-        this.subscriptions.length = 0;
+        if (err) {
+            this.setState(Asyncplify.states.CLOSED);
+            this.sink.end(err);
+        } else if (!this.items.length && !this.source) {
+            this.sink.end(null);
+        } else if (this.source && this.maxConcurrency && count === this.maxConcurrency && this.isPaused) {
+            this.isPaused = false;
+            if (this.state === Asyncplify.states.RUNNING) this.source.setState(Asyncplify.states.RUNNING);
+        }
     },
     emit: function (v) {
         var item = this.mapper(v);
         if (item) {
-            this.sources.push(item);
-            this.subscribe(null);
+            var flatMapItem = new FlatMapItem(this);
+            this.items.push(flatMapItem);
+
+            if (this.maxConcurrency && this.items.length >= this.maxConcurrency && !this.isPaused) {
+                this.isPaused = true;
+                this.source.setState(Asyncplify.states.PAUSED);
+            }
+
+            item._subscribe(flatMapItem);
         }
     },
     end: function (err) {
         this.source = null;
-        this.subscribe(err);
+        if (err) this.setState(Asyncplify.states.CLOSED);
+        if (err || !this.items.length) this.sink.end(err);
     },
-    subscribe: function (err) {
-        var sink = this.sink;
+    setState: function (state) {
+        if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
+            this.state = state;
 
-        if (err) {
-            this.close();
-            sink.end(err);
-        } else if (!this.isSubscribing) {
-            this.isSubscribing = true;
+            if (this.source && !this.isPaused)
+                this.source.setState(state);
 
-            while (this.sources.length && (this.maxConcurrency < 1 || (this.source ? 1 : 0) + this.subscriptions.length < this.maxConcurrency)) {
-                var item = new FlatMapItem(this);
-                this.subscriptions.push(item);
-                this.sources.shift()._subscribe(item);
-            }
-
-            this.isSubscribing = false;
-
-            if (!this.sources.length && !this.subscriptions.length && !this.source) {
-                this.mapper = noop;
-                this.sink = NoopSink.instance;
-                sink.end(null);
-            }
+            for (var i = 0; i < this.items.length && this.state === state; i++)
+                this.items[i].setState(state);
         }
     }
 };

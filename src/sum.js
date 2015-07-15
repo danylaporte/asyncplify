@@ -14,10 +14,6 @@ function Sum(mapper, sink, source) {
 }
 
 Sum.prototype = {
-    close: function () {
-        if (this.source) this.source.close();
-        this.source = this.sink = this.mapper = null;
-    },
     emit: function (value) {
         this.value += this.mapper(value) || 0;
         this.hasValue = true;
@@ -25,6 +21,9 @@ Sum.prototype = {
     end: function (err) {
         this.source = null;
         if (!err && this.hasValue && this.sink) this.sink.emit(this.value);
-        if (this.sink) this.sink.end(err);
+        this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

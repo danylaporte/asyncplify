@@ -14,11 +14,6 @@ function Last(cond, sink, source) {
 }
 
 Last.prototype = {
-    close: function () {
-        if (this.source) this.source.close();
-        this.sink = NoopSink.instance;
-        this.source = null;  
-    },
     emit: function (value) {
         if (this.cond(value)) {
             this.item = value;
@@ -30,5 +25,8 @@ Last.prototype = {
         
         if (!err && this.hasItem) this.sink.emit(this.item);
         this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

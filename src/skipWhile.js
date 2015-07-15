@@ -13,12 +13,6 @@ function SkipWhile(cond, sink, source) {
 }
 
 SkipWhile.prototype = {
-    close: function () {
-        this.cond = condTrue;
-        this.sink = NoopSink.instance;
-        if (this.source) this.source.close();
-        this.source = null;
-    },
     emit: function (value) {
         if (this.can || !this.cond(value)) {
             this.can = true;
@@ -27,9 +21,10 @@ SkipWhile.prototype = {
     },
     end: function (err) {
         this.cond = condTrue;
-        this.source = null;        
-        var sink = this.sink;
-        this.sink = NoopSink.instance;
-        sink.end(err);
+        this.source = null;
+        this.sink.end(err);
+    },
+    setState: function (state) {
+        if (this.source) this.source.setState(state);
     }
 };

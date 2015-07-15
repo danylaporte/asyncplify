@@ -13,16 +13,6 @@ function Finally(action, sink, source) {
 }
 
 Finally.prototype = {
-    close: function () {
-        this.sink = NoopSink.instance;
-        
-        if (this.source) {
-            this.source.close();
-            this.source = null;
-            this.registerProcessEnd(false);
-            this.action();
-        }
-    },
     emit: function (value) {
         this.sink.emit(value);
     },
@@ -30,6 +20,7 @@ Finally.prototype = {
         this.source = null;
         this.registerProcessEnd(false);
         this.action();
+        this.action = noop;
         this.sink.end(err);
     },
     registerProcessEnd: function (register) {
@@ -38,6 +29,17 @@ Finally.prototype = {
             process[n]('SIGINT', this.action);
             process[n]('SIGQUIT', this.action);
             process[n]('SIGTERM', this.action);
+        }
+    },
+    setState: function (state) {
+        if (this.source) {
+            this.source.setState(state);
+            
+            if (state === Asyncplify.states.CLOSED) {
+                this.source = null;
+                this.registerProcessEnd(false);
+                this.action();
+            }
         }
     }
 };

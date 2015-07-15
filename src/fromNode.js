@@ -26,6 +26,7 @@ function FromNode(options, sink) {
     }
 }
 
-FromNode.prototype.close = function () {
-    this.sink = NoopSink.instance;
+FromNode.prototype.setState = function (state) {
+    if (state === Asyncplify.states.CLOSED)
+        this.sink = NoopSink.instance;
 };

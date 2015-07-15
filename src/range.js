@@ -3,19 +3,33 @@ Asyncplify.range = function (options) {
 };
 
 function RangeOp(options, sink) {
-    var i = options && options.start || 0;
-    var end = typeof options === 'number' ? options : options && options.end || 0;
-    var step = options && options.step || 1;
-    
+    this.end = typeof options === 'number' ? options : options && options.end || 0;
+    this.i = options && options.start || 0; 
     this.sink = sink;
     this.sink.source = this;
+    this.state = Asyncplify.states.RUNNING;
+    this.step = options && options.step || 1;
     
-    for (; i < end && this.sink; i += step)
-        this.sink.emit(i);
-        
-    if (this.sink) this.sink.end(null);
+    this.emitValues();
 }
 
-RangeOp.prototype.close = function () {
-    this.sink = null;
+RangeOp.prototype = {
+    emitValues: function () {
+        while (this.i < this.end && this.state === Asyncplify.states.RUNNING) {
+            var j = this.i;
+            this.i += this.step;
+            this.sink.emit(j);
+        }
+            
+        if (this.state === Asyncplify.states.RUNNING) {
+            this.state = Asyncplify.states.CLOSED;
+            this.sink.end(null);
+        }
+    },
+    setState: function (state) {
+        if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
+            this.state = state;
+            if (state === Asyncplify.states.RUNNING) this.emitValues();
+        }
+    }
 };

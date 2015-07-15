@@ -30,18 +30,17 @@ function Subject(_, sink, parent) {
 }
 
 Subject.prototype = {
-    close: function () {
-        if (this.parent) removeItem(this.parent.subjects, this);
-        this.parent = null;
-    },
     emit: function (value) {
         this.sink.emit(value);
     },
     end: function (err) {
         this.parent = null;
-        
-        var sink = this.sink;
-        this.sink = NoopSink.instance;
-        sink.end(err);
+        this.sink.end(err);
+    },
+    setState: function (state) {
+        if (state === Asyncplify.states.CLOSED && this.parent) {
+            removeItem(this.parent.subjects, this);
+            this.parent = null;
+        }
     }
 };
