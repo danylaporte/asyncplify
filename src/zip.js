@@ -3,9 +3,12 @@ Asyncplify.zip = function (options) {
 };
 
 function Zip(options, sink) {
-    var items = options.items || options || [];
-
+    var items = options && options.items || options;
+    
     this.mapper = options && options.mapper || null;
+    
+    if (!Array.isArray(items)) items = this.objectMap(items);    
+    
     this.sink = sink;
     this.sink.source = this;
     this.subscribables = items.length;
@@ -19,10 +22,36 @@ function Zip(options, sink) {
     if (!items.length) this.sink.end(null);
 }
 
-Zip.prototype.setState = function (state) {
-    for (var i = 0; i < this.subscriptions.length; i++)
-        this.subscriptions[i].setState(Asyncplify.states.CLOSED);
-};
+Zip.prototype = {
+    objectMap: function (obj) {
+        var array = [];
+        var mapping = [];
+        
+        for (var k in obj) {
+            var source;
+            
+            if (obj.hasOwnProperty(k) && (source = obj[k]) && source._subscribe) {
+                array.push(source);
+                mapping.push(k);
+            }
+        }
+        
+        this.mapper = function () {
+            var obj = {};
+            
+            for (var i = 0; i < mapping.length; i++)
+                obj[mapping[i]] = arguments[i];
+                
+            return obj;
+        }
+        
+        return array;
+    },
+    setState: function (state) {
+        for (var i = 0; i < this.subscriptions.length; i++)
+            this.subscriptions[i].setState(Asyncplify.states.CLOSED);
+    }
+}
 
 function ZipItem(source, parent) {
     this.items = [];

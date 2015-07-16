@@ -24,4 +24,11 @@ describe('zip', function () {
             title: 'should finish with interval', 
             values: [[0, 0], [1, 1], [2, 2], [3,3]]
         }));
+        
+    asyncplify
+        .zip({ x: asyncplify.range(2), y: asyncplify.range(2) })
+        .pipe(tests.itShouldEmitValues({
+            title: 'should support object mapping', 
+            values: [{x: 0, y: 0}, {x: 1, y: 1}]
+        }));
 });
