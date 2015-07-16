@@ -1,6 +1,6 @@
 {
   "name": "asyncplify",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "FRP (functional reactive programming) library for Javascript",
   "main": "dist/asyncplify.js",
   "scripts": {
@@ -22,7 +22,7 @@
   "dependencies": {},
   "devDependencies": {
     "asyncplify-tests": "^1.0.1",
-    "bluebird": "^2.9.33",
+    "bluebird": "^2.9.34",
     "gulp": "^3.9.0",
     "gulp-bench": "^1.1.0",
     "gulp-concat": "^2.6.0",

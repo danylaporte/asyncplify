@@ -26,5 +26,7 @@ Subscribe.prototype = {
         this.source.setState(Asyncplify.states.RUNNING);
     },
     emit: noop,
-    end: noop
+    end: function (err) {
+        if (err) throw err;
+    }
 };

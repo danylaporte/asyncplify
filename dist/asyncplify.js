@@ -1298,7 +1298,10 @@
             this.source.setState(Asyncplify.states.RUNNING);
         },
         emit: noop,
-        end: noop
+        end: function (err) {
+            if (err)
+                throw err;
+        }
     };
     Asyncplify.prototype.subscribeOn = function (options) {
         return new Asyncplify(SubscribeOn, options, this);

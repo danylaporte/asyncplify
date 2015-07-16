@@ -6,6 +6,6 @@ describe('throw', function () {
     
     asyncplify
         .throw(error)
-        .pipe(tests.itShouldClose())
+        //.pipe(tests.itShouldClose())  // Actually throw an exception.
         .pipe(tests.itShouldEndSync({ error: error }));
 });

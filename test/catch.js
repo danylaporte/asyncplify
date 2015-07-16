@@ -11,11 +11,11 @@ describe('catch', function () {
 
 	s1
         .catch([s2, s3])
-        .pipe(tests.itShouldClose())
         .pipe(tests.itShouldEndSync({ error: 'error3' }));
 
 	s1
         .catch([s2, s3, s4])
+        .pipe(tests.itShouldClose())
         .pipe(tests.itShouldEmitValues([2]));
         
     s1
