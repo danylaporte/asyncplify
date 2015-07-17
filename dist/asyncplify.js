@@ -1760,7 +1760,7 @@
         },
         setState: function (state) {
             for (var i = 0; i < this.subscriptions.length; i++)
-                this.subscriptions[i].setState(Asyncplify.states.CLOSED);
+                this.subscriptions[i].setState(state);
         }
     };
     function ZipItem(source, parent) {
@@ -1781,7 +1781,7 @@
                     s = subscriptions[i];
                     if (!s.items.length)
                         return;
-                    array.push(s.items.splice(0, 1)[0]);
+                    array.push(s.items.shift());
                 }
                 this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
                 for (i = 0; i < subscriptions.length; i++) {
