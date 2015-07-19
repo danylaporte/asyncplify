@@ -5,7 +5,7 @@ Asyncplify.prototype.flatMap = function (options) {
 function FlatMap(options, sink, source) {
     this.isPaused = false;
     this.items = [];
-    this.mapper = options.mapper || options;
+    this.mapper = options.mapper || options || identity;
     this.maxConcurrency = Math.max(options.maxConcurrency || 0, 0);
     this.sink = sink;
     this.sink.source = this;

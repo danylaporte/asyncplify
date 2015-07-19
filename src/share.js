@@ -1,9 +1,11 @@
-Asyncplify.prototype.share = function (options) {
+Asyncplify.prototype.share = function (scheduler) {
     var r = new Asyncplify(Share, null, this);
     r.emit = shareEmit;
     r.end = shareEnd;
-    r._scheduler = options && options.scheduler && options.scheduler() || schedulers.sync();
+    r.source = null;
     r._refs = [];
+    r._scheduler = null;
+    r._schedulerFactory = scheduler || schedulers.immediate;
     return r;
 };
 
@@ -14,6 +16,8 @@ function shareEmit(value) {
 
 function shareEnd(err) {
     var array = this._refs;
+
+    this.source = null;
     this._refs = [];
 
     for (var i = 0; i < array.length; i++)
@@ -24,18 +28,19 @@ function Share(_, sink, source, parent) {
     this.parent = parent;
     this.sink = sink;
     this.sink.source = this;
+    this.state = Asyncplify.states.RUNNING;
 
     parent._refs.push(this);
 
-    var self = this;
-
     if (parent._refs.length === 1) {
+        this.parent._scheduler = this.parent._schedulerFactory();
+
         parent._scheduler.schedule({
             action: function () {
                 source._subscribe(parent);
             },
             error: function (err) {
-                self.sink.end(err);
+                parent.end(err);
             }
         });
     }
@@ -46,25 +51,28 @@ Share.prototype = {
         this.sink.emit(value);
     },
     end: function (err) {
-        this.parent.source = null;
+        this.state = Asyncplify.states.CLOSED;
         this.parent = null;
         this.sink.end(err);
     },
     setState: function (state) {
-        if (this.parent) {
-            if (state === Asyncplify.states.CLOSED) {
-                removeItem(this.parent._refs, this);
+        if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
+            this.state = state;
 
-                if (!this.parent._refs.length) {
-                    this.parent._scheduler.setState(state);
-                    if (this.parent.source) this.parent.source.setState(state);
-                    this.parent.source = null;
-                }
+            switch (state) {
+                case Asyncplify.states.RUNNING:
+                    for (var i = 0; i < this.parent._refs.length; i++)
+                        if (this.parent._refs[i].state !== Asyncplify.states.RUNNING) return;
+                    break;
 
-                this.parent = null;
-            } else if (this.parent.source) {
-                this.parent.source.setState(state);
+                case Asyncplify.states.CLOSED:
+                    removeItem(this.parent._refs, this);
+                    if (this.parent._refs.length) return;
+                    break;
             }
+
+            if (this.parent._scheduler) this.parent._scheduler.setState(state);
+            if (this.parent.source) this.parent.source.setState(state);
         }
     }
 };
