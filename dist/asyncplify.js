@@ -524,7 +524,7 @@
         setState: function (state) {
             if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
                 this.state = state;
-                if (this.source && !this.isPaused)
+                if (this.source && (!this.isPaused || state === Asyncplify.states.CLOSED))
                     this.source.setState(state);
                 for (var i = 0; i < this.items.length && this.state === state; i++)
                     this.items[i].setState(state);
