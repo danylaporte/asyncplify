@@ -15,7 +15,7 @@ function FromNode(options, sink) {
     var self = this;
     
     function callback(err, value) {
-        self.sink.emit(value);
+        if (!err) self.sink.emit(value);
         self.sink.end(err);
     }
     
