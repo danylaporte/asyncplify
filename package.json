@@ -1,6 +1,6 @@
 {
   "name": "asyncplify",
-  "version": "0.5.9",
+  "version": "0.5.10",
   "description": "FRP (functional reactive programming) library for Javascript",
   "main": "dist/asyncplify.js",
   "scripts": {
@@ -19,7 +19,9 @@
     "type": "git",
     "url": "https://github.com/danylaporte/asyncplify.git"
   },
-  "dependencies": {},
+  "dependencies": {
+    "debug": "^2.2.0"
+  },
   "devDependencies": {
     "asyncplify-tests": "^1.0.1",
     "bluebird": "^2.9.34",
