@@ -1,5 +1,8 @@
 (function () {
     'use strict';
+    var debug = typeof require === 'undefined' ? function () {
+        return noop;
+    } : require('debug');
     function Asyncplify(func, arg, source) {
         this._arg = arg;
         this._func = func;
@@ -476,6 +479,7 @@
     Asyncplify.prototype.flatMap = function (options) {
         return new Asyncplify(FlatMap, options, this);
     };
+    var flatMapDebug = debug('asyncplify:flatMap');
     function FlatMap(options, sink, source) {
         this.isPaused = false;
         this.items = [];
@@ -485,6 +489,7 @@
         this.sink.source = this;
         this.state = Asyncplify.states.RUNNING;
         this.source = null;
+        flatMapDebug('subscribe');
         source._subscribe(this);
     }
     FlatMap.prototype = {
@@ -495,31 +500,40 @@
                 this.setState(Asyncplify.states.CLOSED);
                 this.sink.end(err);
             } else if (!this.items.length && !this.source) {
+                flatMapDebug('end');
                 this.sink.end(null);
             } else if (this.source && this.maxConcurrency && count === this.maxConcurrency && this.isPaused) {
                 this.isPaused = false;
-                if (this.state === Asyncplify.states.RUNNING)
+                if (this.state === Asyncplify.states.RUNNING) {
+                    flatMapDebug('resuming source');
                     this.source.setState(Asyncplify.states.RUNNING);
+                }
             }
         },
         emit: function (v) {
+            flatMapDebug('receive %j', v);
             var item = this.mapper(v);
             if (item) {
-                var flatMapItem = new FlatMapItem(this);
+                var flatMapItem = new FlatMapItem(this, flatMapDebug);
                 this.items.push(flatMapItem);
                 if (this.maxConcurrency && this.items.length >= this.maxConcurrency && !this.isPaused) {
                     this.isPaused = true;
+                    flatMapDebug('pausing source because of max concurrency.');
                     this.source.setState(Asyncplify.states.PAUSED);
                 }
+                flatMapDebug('subscribe to item.');
                 item._subscribe(flatMapItem);
             }
         },
         end: function (err) {
+            flatMapDebug('source completed');
             this.source = null;
             if (err)
                 this.setState(Asyncplify.states.CLOSED);
-            if (err || !this.items.length)
+            if (err || !this.items.length) {
+                err ? flatMapDebug('error', err) : flatMapDebug('end');
                 this.sink.end(err);
+            }
         },
         setState: function (state) {
             if (this.state !== state && this.state !== Asyncplify.states.CLOSED) {
@@ -531,15 +545,18 @@
             }
         }
     };
-    function FlatMapItem(parent) {
+    function FlatMapItem(parent, debug) {
+        this.debug = debug || noop;
         this.parent = parent;
         this.source = null;
     }
     FlatMapItem.prototype = {
         emit: function (v) {
+            this.debug('flatMapItem emit %j', v);
             this.parent.sink.emit(v);
         },
         end: function (err) {
+            err ? this.debug('flatMapItem error', err) : this.debug('flatMapItem end');
             this.parent.childEnd(err, this);
         },
         setState: function (state) {
@@ -1733,6 +1750,7 @@
     Asyncplify.zip = function (options) {
         return new Asyncplify(Zip, options);
     };
+    var zipDebug = debug('asyncplify:zip');
     function Zip(options, sink) {
         var items = options && options.items || options;
         this.mapper = options && options.mapper || null;
@@ -1742,9 +1760,10 @@
         this.sink.source = this;
         this.subscribables = items.length;
         this.subscriptions = [];
+        zipDebug('subscribe to %d item(s)', items.length);
         for (var i = 0; i < items.length && this.sink; i++) {
             this.subscribables--;
-            new ZipItem(items[i], this);
+            new ZipItem(items[i], this, i);
         }
         if (!items.length)
             this.sink.end(null);
@@ -1773,7 +1792,8 @@
                 this.subscriptions[i].setState(state);
         }
     };
-    function ZipItem(source, parent) {
+    function ZipItem(source, parent, index) {
+        this.index = index;
         this.items = [];
         this.parent = parent;
         this.source = null;
@@ -1782,21 +1802,24 @@
     }
     ZipItem.prototype = {
         emit: function (v) {
+            zipDebug('child %d received %j', this.index, v);
             this.items.push(v);
-            if (this.items.length === 1 && !this.parent.subscribables && this.parent.sink) {
+            if (this.items.length === 1 && !this.parent.subscribables) {
                 var array = [];
                 var i, s;
                 var subscriptions = this.parent.subscriptions;
-                for (i = 0; i < subscriptions.length; i++) {
-                    s = subscriptions[i];
-                    if (!s.items.length)
+                for (i = 0; i < subscriptions.length; i++)
+                    if (!subscriptions[i].items.length)
                         return;
-                    array.push(s.items.shift());
-                }
-                this.parent.sink.emit(this.parent.mapper ? this.parent.mapper.apply(null, array) : array);
+                for (i = 0; i < subscriptions.length; i++)
+                    array.push(subscriptions[i].items.shift());
+                var result = this.parent.mapper ? this.parent.mapper.apply(null, array) : array;
+                zipDebug('emit %j', result);
+                this.parent.sink.emit(result);
                 for (i = 0; i < subscriptions.length; i++) {
                     s = subscriptions[i];
                     if (!s.source && !s.items.length) {
+                        zipDebug('end');
                         this.parent.mapper = noop;
                         this.parent.setState(Asyncplify.states.CLOSED);
                         this.parent.sink.end(null);
@@ -1808,7 +1831,11 @@
         },
         end: function (err) {
             this.source = null;
+            zipDebug('child %d end %j', this.index, err);
             if (err || !this.items.length) {
+                if (!err)
+                    zipDebug('end');
+                this.parent.setState(Asyncplify.states.CLOSED);
                 this.parent.mapper = noop;
                 this.parent.sink.end(err);
                 this.parent.sink = NoopSink.instance;

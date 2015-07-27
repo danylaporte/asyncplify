@@ -1,3 +1,5 @@
+var debug = typeof require === 'undefined' ? function () { return noop; } : require('debug');
+
 function Asyncplify(func, arg, source) {
     this._arg = arg;
     this._func = func;
