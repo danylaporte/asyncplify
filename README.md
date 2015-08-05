@@ -1,4 +1,6 @@
-[![npm version](https://badge.fury.io/js/asyncplify.svg)](http://badge.fury.io/js/asyncplify)[![Build Status](https://travis-ci.org/danylaporte/asyncplify.svg)](https://travis-ci.org/danylaporte/asyncplify)
+[![npm version](https://badge.fury.io/js/asyncplify.svg)](http://badge.fury.io/js/asyncplify)
+[![Build Status](https://travis-ci.org/danylaporte/asyncplify.svg)](https://travis-ci.org/danylaporte/asyncplify)
+[![Code Climate](https://codeclimate.com/github/danylaporte/asyncplify/badges/gpa.svg)](https://codeclimate.com/github/danylaporte/asyncplify)
 
 # asyncplify
 FRP (functional reactive programming) library for Javascript.
